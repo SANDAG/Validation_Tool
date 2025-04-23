@@ -27,7 +27,7 @@ def read_volumes(volume_name, conn):
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT scenario_id,ID,Length,FC,FFC, SPHERE,geometry as Shape FROM {table_name} WHERE scenario_id = 1132"
+        query = f"SELECT scenario_id,ID,Length,FC,FFC, SPHERE,geometry as Shape FROM {table_name} WHERE scenario_id = 261"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
