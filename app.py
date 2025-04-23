@@ -13,6 +13,7 @@ import dash_bootstrap_components as dbc
 
 # === Load Excel Sheets ===
 df = pd.read_excel("vis_worksheet.xlsx", sheet_name='fwy_worksheet')
+df2 = pd.read_excel("vis_worksheet.xlsx", sheet_name='allclass_worksheet')
 
 # === Load GeoJSON ===
 with open("Joined_hwy.geojson", "r") as f:
@@ -22,6 +23,7 @@ with open("Joined_hwy.geojson", "r") as f:
 # selected_columns = ['nm', 'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev', 'source','DAY_Flow','pmsa_nm','gap_day','hwycovid']
 df_filtered = df.copy()
 df_filtered = df_filtered.dropna(subset=['count_day', 'DAY_Flow'])
+df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
 
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered.copy()
@@ -89,38 +91,37 @@ scatter_fig = px.scatter(
 # Modify marker size for all points
 scatter_fig.update_traces(marker=dict(size=9)) 
 
-# === Regression line ===
-x = scatter_df['count_day']
-y = scatter_df['DAY_Flow']
-slope, intercept = np.polyfit(x, y, 1)
-line_x = np.linspace(x.min(), x.max(), 100)
-line_y = slope * line_x + intercept
-r_squared = 1 - np.sum((y - (slope * x + intercept)) ** 2) / np.sum((y - y.mean()) ** 2)
+# # === Regression line ===
+# x = scatter_df['count_day']
+# y = scatter_df['DAY_Flow']
+# slope, intercept = np.polyfit(x, y, 1)
+# line_x = np.linspace(x.min(), x.max(), 100)
+# line_y = slope * line_x + intercept
+# r_squared = 1 - np.sum((y - (slope * x + intercept)) ** 2) / np.sum((y - y.mean()) ** 2)
 
-# Add regression line
-scatter_fig.add_trace(go.Scatter(
-    x=line_x,
-    y=line_y,
-    mode='lines',
-    name='Best Fit Line',
-    line=dict(color='grey', dash='dash',width=3)
-))
+# # Add regression line
+# scatter_fig.add_trace(go.Scatter(
+#     x=line_x,
+#     y=line_y,
+#     mode='lines',
+#     name='Best Fit Line',
+#     line=dict(color='grey', dash='dash',width=3)
+# ))
 
-# Annotate slope and R²
-scatter_fig.add_annotation(
-    xref='paper', yref='paper',
-    x=0.05, y=0.95,
-    text=f"Slope: {slope:.2f}, R²: {r_squared:.2f}",
-    showarrow=False,
-    font=dict(size=12)
-)
+# # Annotate slope and R²
+# scatter_fig.add_annotation(
+#     xref='paper', yref='paper',
+#     x=0.05, y=0.95,
+#     text=f"Slope: {slope:.2f}, R²: {r_squared:.2f}",
+#     showarrow=False,
+#     font=dict(size=12)
+# )
 
-scatter_fig.update_layout(height=500, width=700)
 
 # === Calculate R² slope and PRMSE per PMSA ===
 results = []
 
-for pmsa, group in df_filtered.groupby('pmsa_nm'):
+for pmsa, group in df_filtered2.groupby('pmsa_nm'):
     x = pd.to_numeric(group['count_day'], errors='coerce')
     y = pd.to_numeric(group['DAY_Flow'], errors='coerce')
     
@@ -310,25 +311,40 @@ leaflet_map = dl.Map(
 # === Define Page 1 Layout: Volume Validation ===
 def page_volume_validation():
     return html.Div([
-        html.Div([
-            html.Div([
-                html.H2("PRMSE"),
-                dcc.Graph(figure=bar_fig2, style={'height': '300px'}),
-                html.H2("R² and Slope"),
-                dcc.Graph(figure=bar_fig, style={'height': '300px'})
-            ], style={'flex': '1', 'padding': '10px', 'boxSizing': 'border-box'}),
+html.Div([
+    html.Div([
+        html.H2("R² and Slope", style={'marginRight': '20px'}),
+        dcc.Dropdown(
+            id='groupby_selector',
+            options=[
+                {'label': 'By PMSA', 'value': 'pmsa_nm'},
+                {'label': 'By City', 'value': 'city_nm'},
+                {'label': 'By Direction', 'value': 'dir_nm'},
+                {'label': 'By Road Class', 'value': 'rdClass'}
+            ],
+            value='pmsa_nm',
+            clearable=False,
+            style={'width': '200px'}
+        )
+    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+
+    dcc.Graph(id='bar_fig', style={'height': '400px'}),
+
+    html.H2("PRMSE"),
+    dcc.Graph(id='bar_fig2', style={'height': '400px'})
+], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box'}),
 
             html.Div([
                 html.H2("Model Day Flow VS Observed Daily Count"),
                 dcc.Graph(id='scatter', figure=scatter_fig, style={'height': '700px'})
-            ], style={'flex': '1', 'padding': '10px', 'boxSizing': 'border-box'}),
+            ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box'}),
 
             html.Div([
                 html.H2("Map: Gap Day by Hwy Coverage ID"),
                 leaflet_map
-            ], style={'flex': '1', 'padding': '10px', 'boxSizing': 'border-box'})
-        ], style={'display': 'flex', 'width': '100%', 'height': '800px'})
-    ])
+            ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box'})
+        ], style={'display': 'flex', 'width': '100%', 'height': '1000px'})
+
 
 # === Define Page 2 Layout: Volume Validation by Hwy ===
 def page_volume_by_hwy():
@@ -348,6 +364,40 @@ def page_volume_by_hwy():
         ], style={'display': 'flex', 'width': '100%', 'height': '800px'})
     ])
 
+# === Define Page 3 Layout: VMT===
+def page_vmt_comparison():
+    from plotly.subplots import make_subplots
+
+    def make_vmt_fig(group_col, title):
+        df_vmt = df_filtered2.copy()
+        grouped = df_vmt.groupby(group_col)[['DAY_Vmt', 'vmt_day']].sum().reset_index()
+        grouped = grouped.rename(columns={group_col: 'Group'})
+        fig = px.bar(
+            grouped.melt(id_vars='Group', value_vars=['DAY_Vmt', 'vmt_day']),
+            x='Group',
+            y='value',
+            color='variable',
+            barmode='group',
+            labels={'value': '', 'variable': '', 'Group': ''},
+            title=title,
+            color_discrete_map={'DAY_Vmt': '#08306b', 'vmt_day': '#cb181d'}
+        )
+        fig.update_layout(margin=dict(t=40, b=30, l=20, r=20), height=300)
+        return fig
+
+    return html.Div([
+        html.H2("VMT Comparison: Model vs Observed by Different Groups", style={'textAlign': 'center'}),
+        html.Div([
+            dcc.Graph(figure=make_vmt_fig('pmsa_nm', 'By PMSA'), style={'width': '48%', 'display': 'inline-block'}),
+            dcc.Graph(figure=make_vmt_fig('vcategory', 'By Category'), style={'width': '48%', 'display': 'inline-block'}),
+        ], style={'display': 'flex', 'justifyContent': 'space-between'}),
+        html.Div([
+            dcc.Graph(figure=make_vmt_fig('city_nm', 'By City'), style={'width': '48%', 'display': 'inline-block'}),
+            dcc.Graph(figure=make_vmt_fig('rdClass', 'By Road Class'), style={'width': '48%', 'display': 'inline-block'}),
+        ], style={'display': 'flex', 'justifyContent': 'space-between'})
+    ], style={'padding': '20px'})
+
+
 # === Full App Layout with Collapsible Sidebar ===
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
@@ -360,10 +410,11 @@ html.Div([
         'zIndex': '1001'
     }),
     html.Div(id='sidebar-content', children=[
-        html.H2("Menu", style={'textAlign': 'center'}),
+        html.H2(" "),
         html.Hr(),
         dcc.Link("Volume Validation", href="/", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Validation by Hwy", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'})
+        dcc.Link("Validation by Hwy", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
+        dcc.Link("VMT Comparison", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'})
     ], style={
         'position': 'fixed',
         'top': '0',
@@ -384,41 +435,6 @@ html.Div([
 
 
 
-@app.callback(
-    Output("popup", "children"),
-    Input("geojson", "clickData")
-)
-def show_popup(clickData):
-    
-    if not clickData or "properties" not in clickData:
-        return "No feature selected"
-
-    props = clickData["properties"]
-
-    return html.Div([
-        html.B(f"Segment: {props.get('nm', 'N/A')}"),
-        html.Br(),
-        f"Length: {round(props.get('length', 0), 2)} meters",
-        html.Br(),
-        f"Gap Day: {props.get('gap_day', 'N/A')}%"
-    ])
-
-
-# @app.callback(
-#     Output('gap_histogram', 'figure'),
-#     Input('gap_column_selector', 'value')
-# )
-# def update_gap_histogram(selected_column):
-#     filtered = df_filtered.dropna(subset=[selected_column])
-#     fig = px.histogram(
-#         filtered,
-#         x=selected_column,
-#         nbins=30,
-#         labels={selected_column: selected_column.replace("_", " ").title()},
-#         color_discrete_sequence=["#08306b"]
-#     )
-#     fig.update_layout(title=f"Histogram of {selected_column.replace('_', ' ').title()}")
-#     return fig
 
 # === Page Router Callback ===
 @app.callback(
@@ -428,7 +444,10 @@ def show_popup(clickData):
 def render_page(pathname):
     if pathname == '/volume_by_hwy':
         return page_volume_by_hwy()
+    elif pathname == '/vmt_comparison':
+        return page_vmt_comparison()
     return page_volume_validation()
+
 
 # === Collapsible Sidebar Toggle ===
 @app.callback(
@@ -448,6 +467,26 @@ def toggle_sidebar(n, sidebar_style, page_style):
     return sidebar_style, page_style
 
 
+
+# === Popup Window in Map Callback ===
+@app.callback(
+    Output("popup", "children"),
+    Input("geojson", "clickData")
+)
+def show_popup(clickData):
+    
+    if not clickData or "properties" not in clickData:
+        return "No feature selected"
+
+    props = clickData["properties"]
+
+    return html.Div([
+        html.B(f"Segment: {props.get('nm', 'N/A')}"),
+        html.Br(),
+        f"Length: {round(props.get('length', 0), 2)} meters",
+        html.Br(),
+        f"Gap Day: {props.get('gap_day', 'N/A')}%"
+    ])
 
 # === Map Highlight Callback ===
 @app.callback(
@@ -488,6 +527,64 @@ def get_map_center(selected_id, hideout):
             center = coords[mid_idx][::-1]
             return hideout, center, 14
     return hideout, dash.no_update, dash.no_update
+
+# === Bar Graph Callback ===
+@app.callback(
+    Output('bar_fig', 'figure'),
+    Output('bar_fig2', 'figure'),
+    Input('groupby_selector', 'value')
+)
+def update_both_bar_charts(groupby_col):
+    results = []
+
+    for group_val, group in df_filtered2.groupby(groupby_col):
+        x = pd.to_numeric(group['count_day'], errors='coerce')
+        y = pd.to_numeric(group['DAY_Flow'], errors='coerce')
+        
+        mask = ~np.isnan(x) & ~np.isnan(y)
+        x_clean = x[mask]
+        y_clean = y[mask]
+
+        if len(x_clean) > 1:
+            slope, intercept = np.polyfit(x_clean, y_clean, 1)
+            y_pred = slope * x_clean + intercept
+            r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
+
+            rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
+            mean_obs = np.mean(y_clean)
+            prmse = (rmse / mean_obs) * 100 if mean_obs != 0 else np.nan
+
+            results.append({
+                'Group': group_val,
+                'R_squared': round(r_squared, 2),
+                'Slope': round(slope, 2),
+                'PRMSE': round(prmse, 2)
+            })
+
+    result_df = pd.DataFrame(results)
+
+    fig1 = px.bar(
+        result_df.melt(id_vars='Group', value_vars=['R_squared', 'Slope']),
+        x='Group',
+        y='value',
+        color='variable',
+        barmode='group',
+        color_discrete_map={'R_squared': '#08306b', 'Slope': '#cb181d'}
+    )
+    fig1.update_layout(xaxis_title='', yaxis_title='')
+
+    fig2 = px.bar(
+        result_df.melt(id_vars='Group', value_vars=['PRMSE']),
+        x='Group',
+        y='value',
+        color='variable',
+        barmode='group',
+        color_discrete_map={'PRMSE': '#08306b'}
+    )
+    fig2.update_layout(xaxis_title='', yaxis_title='')
+
+    return fig1, fig2
+
 
 
 # === Run App ===
