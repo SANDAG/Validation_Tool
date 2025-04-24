@@ -27,7 +27,7 @@ def read_volumes(volume_name, conn):
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT scenario_id,ID,Length,FC,FFC, SPHERE,geometry as Shape FROM {table_name} WHERE scenario_id = 261"
+        query = f"SELECT scenario_id,ID,Length,geometry as Shape FROM {table_name} WHERE scenario_id = 261"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -38,12 +38,12 @@ conn = get_connection(http_path_input)
 
 df = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
 df2 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - gap_stat_road_type.csv', conn)
-df3 = read_table('tam.abm_15_2_0.network__emme_hwy_tcad ', conn)
+df_link = read_table('tam.abm_15_2_0.network__emme_hwy_tcad ', conn)
+df['hwycovid'] = df['hwycovid'].astype(str)
+df_link['ID'] = df_link['ID'].astype(str)
 
-print(df3.head())
-# geo_path = "/dbfs/Volumes/tam/abm_15_2_0/validation/Joined_hwy.geojson"
-# geojson_data = read_geojson_fallback('/Volumes/tam/abm_15_2_0/validation/Joined_hwy.geojson')
-# print(geojson_data.head())
+geojson_data = df.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
+
 df_filtered = df.dropna(subset=['count_day', 'DAY_Flow'])
 
 # R2 and slope per PMSA
