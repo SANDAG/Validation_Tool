@@ -51,9 +51,6 @@ def clean_and_convert_columns(df, columns):
     existing_cols = [col for col in columns if col in df.columns]
     missing_cols = [col for col in columns if col not in df.columns]
 
-    if missing_cols:
-        print(f"⚠️ Skipped missing columns: {missing_cols}")
-
     # Drop rows with NaN in any of the existing columns
     df_cleaned = df.dropna(subset=existing_cols).copy()
 
@@ -85,7 +82,8 @@ df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
 df_filtered1['hwycovid'] = df_filtered1['hwycovid'].astype(str)
 df_link['ID'] = df_link['ID'].astype(str)
 merged = df_filtered1.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
-merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:4326')
+merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:2230')
+merged = merged.to_crs('EPSG:4326')
 geojson_str = merged.to_json()
 geojson_data = json.loads(geojson_str)
 
