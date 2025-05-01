@@ -21,15 +21,15 @@ window.dashExtensions = Object.assign({}, window.dashExtensions, {
                 if (gap < -10) {
                     color = '#08306b';
                 } else if (gap < -5) {
-                    color = '#2171b5';
+                    color = '#485187';
                 } else if (gap < 0) {
-                    color = '#6baed6';
+                    color = '#6C649F';
                 } else if (gap < 5) {
-                    color = '#fc9272';
+                    color = '#9057A3';
                 } else if (gap < 10) {
-                    color = '#fb6a4a';
+                    color = '#B44691';
                 } else {
-                    color = '#cb181d';
+                    color = '#F65166';
                 }
             }
 
