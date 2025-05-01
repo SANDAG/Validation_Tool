@@ -45,8 +45,13 @@ conn = get_connection(http_path_input)
 
 df1 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
 df2 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
+df3 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - fwy_spd_worksheet.csv', conn)
 df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
+df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
 df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
+df_filtered3 = df3.copy()
+df_filtered3['Label'] = df_filtered3['fxnm'].fillna('Unknown') + ' to ' + df_filtered3['txnm'].fillna('Unknown')
+
 
 # Clean and Turn data to numeric data
 def clean_and_convert_columns(df, columns):
@@ -72,7 +77,7 @@ columns_to_clean = [
     'vis_order', 'vmt_day', 'gap_day', 'vmt_gap_day',
     'vmt_ea', 'gap_ea', 'vmt_gap_ea', 'vmt_am', 'gap_am', 'vmt_gap_am',
     'vmt_md', 'gap_md', 'vmt_gap_md', 'vmt_pm', 'gap_pm', 'vmt_gap_pm',
-    'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day'
+    'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day','length'
 ]
 
 df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
@@ -476,11 +481,40 @@ def page_volume_by_hwy():
         ], style={'width': '15%', 'padding': '10px', 'boxSizing': 'border-box'}),
 
         html.Div([
-            html.H3("Line Chart: DAY_Flow vs count_day by Segment"),
+            html.H3("Line Chart: Model vs Observed by Segment"),
+
+        html.Div([
             html.Div([
-                dcc.Graph(id='line_plot', figure=line_fig, style={'height': '800px'})
+                html.Label("Time Period:"),
+                dcc.Dropdown(
+                    id='time_period_selector',
+                    options=[{'label': i, 'value': i} for i in ['EA', 'AM', 'MD', 'PM', 'EV', 'Day']],
+                    value='Day',
+                    clearable=False,
+                    style={'width': '150px'}
+                )
+            ], style={'marginRight': '20px'}),
+
+            html.Div([
+                html.Label("Metric:"),
+                dcc.Dropdown(
+                    id='matrix_selector',
+                    options=[
+                        {'label': 'Flow', 'value': 'Flow'},
+                        {'label': 'VMT', 'value': 'VMT'},
+                        {'label': 'Speed', 'value': 'Speed'}
+                    ],
+                    value='Flow',
+                    clearable=False,
+                    style={'width': '150px'}
+                )
+            ])
+        ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
+            html.Div([
+                dcc.Graph(id='line_plot', figure=line_fig, style={'height': '800px', 'minWidth': '1000px'})
             ], style={'overflowX': 'auto', 'width': '100%'})
         ], style={'width': '55%', 'padding': '10px', 'boxSizing': 'border-box'}),
+
         html.Div([
             html.H3("Map: Gap Day by Hwy Coverage ID"),
             leaflet_map
@@ -563,9 +597,9 @@ html.Div([
     html.Div(id='sidebar-content', children=[
         html.H2(" "),
         html.Hr(),
-        dcc.Link("Volume Validation", href="/", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Validation by Hwy", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("VMT Comparison", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'})
+        dcc.Link("All Class Volume Validation", href="/", style={'display': 'block', 'margin': '10px'}),
+        dcc.Link("Highway Volume Validation", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
+        dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'})
     ], style={
         'position': 'fixed',
         'top': '0',
@@ -976,51 +1010,88 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
 
 @app.callback(
     Output('line_plot', 'figure'),
-    Input('corridor_filter', 'value')
+    Input('corridor_filter', 'value'),
+    Input('time_period_selector', 'value'),
+    Input('matrix_selector', 'value')
 )
-def update_line_chart(selected):
-    all_corridors = sorted(df_filtered1['nm'].dropna().unique())
-
-    if not selected:
-        filtered_df = line_df.iloc[0:0]  # Return empty DataFrame
-    elif 'ALL' in selected:
-        filtered_df = line_df
+def update_line_chart(selected_corridors, selected_period, selected_metric):
+    # Choose correct DataFrame
+    if selected_metric == 'Speed':
+        base_df = df_filtered3.copy()  # This must be defined earlier in the script
     else:
-        filtered_df = line_df[line_df['nm'].isin(selected)]
+        base_df = df_filtered1.copy()
 
+    # Filter corridor
+    if not selected_corridors:
+        filtered_df = base_df.iloc[0:0]
+    elif 'ALL' in selected_corridors:
+        filtered_df = base_df
+    else:
+        filtered_df = base_df[base_df['nm'].isin(selected_corridors)]
+
+    # Define column names
+    if selected_period == 'Day':
+        obs_col = {
+            'Flow': 'count_day',
+            'VMT': 'vmt_day',
+            'Speed': 'speed_day'
+        }[selected_metric]
+        model_col = {
+            'Flow': 'DAY_Flow',
+            'VMT': 'DAY_Vmt',
+            'Speed': 'DAY_Speed'
+        }[selected_metric]
+    else:
+        period_lc = selected_period.lower()
+        period_uc = selected_period.upper()
+
+        obs_col = {
+            'Flow': f'count_{period_lc}',
+            'VMT': f'vmt_{period_lc}',
+            'Speed': f'speed_{period_lc}'
+        }[selected_metric]
+
+        model_col = {
+            'Flow': f'{period_uc}_Flow',
+            'VMT': f'{period_uc}_Vmt',
+            'Speed': f'{period_uc}_Speed'
+        }[selected_metric]
+
+
+    # Fallback if missing columns
+    if obs_col not in filtered_df.columns or model_col not in filtered_df.columns:
+        fig = go.Figure()
+        fig.update_layout(title='Selected combination not available in data.')
+        return fig
+
+    # Plot
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
         x=filtered_df['hwycovid'],
-        y=filtered_df['DAY_Flow'],
+        y=filtered_df[model_col],
         customdata=filtered_df[['hwycovid']],
         mode='lines+markers',
-        name='Model DAY_Flow',
+        name=f'Model {model_col}',
         line=dict(color='#08306b')
     ))
 
     fig.add_trace(go.Scatter(
         x=filtered_df['hwycovid'],
-        y=filtered_df['count_day'],
+        y=filtered_df[obs_col],
         customdata=filtered_df[['hwycovid']],
         mode='lines+markers',
-        name='Observed count_day',
+        name=f'Observed {obs_col}',
         line=dict(color='#F65166')
     ))
 
     fig.update_layout(
         xaxis_title='Highway Segment',
-        yaxis_title='Volume',
+        yaxis_title=selected_metric,
         height=800,
-        width=max(1000, len(filtered_df) * 30),  # Auto-scale width
+        width=max(1000, len(filtered_df) * 30),
         margin=dict(l=20, r=20, t=5, b=5),
-        legend=dict(
-            orientation='h',
-            yanchor='bottom',
-            y=1.02,
-            xanchor='left',
-            x=0
-        ),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
         xaxis=dict(
             type='category',
             tickangle=45,
@@ -1029,11 +1100,12 @@ def update_line_chart(selected):
             ticktext=filtered_df['Label'],
             tickfont=dict(size=10),
             showgrid=False,
-            range=[-0.9, len(filtered_df) - 0.8]
+            range=[-0.7, len(filtered_df) - 0.7]
         )
     )
 
     return fig
+
 
 # === Run App ===
 if __name__ == '__main__':
