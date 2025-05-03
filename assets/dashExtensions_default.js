@@ -36,15 +36,15 @@ window.dashExtensions = Object.assign({}, window.dashExtensions, {
             if (isHighlighted) {
                 return {
                     color: 'yellow',
-                    weight: 6,
+                    weight: 7,
                     opacity: 1.0
                 };
             }
 
             return {
                 color: color,
-                weight: 3,
-                opacity: 0.7
+                weight: 2,
+                opacity: 0.8
             };
         }
     }
