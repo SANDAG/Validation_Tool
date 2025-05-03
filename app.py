@@ -77,11 +77,14 @@ columns_to_clean = [
     'vis_order', 'vmt_day', 'gap_day', 'vmt_gap_day',
     'vmt_ea', 'gap_ea', 'vmt_gap_ea', 'vmt_am', 'gap_am', 'vmt_gap_am',
     'vmt_md', 'gap_md', 'vmt_gap_md', 'vmt_pm', 'gap_pm', 'vmt_gap_pm',
-    'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day','length'
+    'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day','length','speed_day','speed_ea',
+    'speed_am','speed_md','speed_pm','speed_ev'
+
 ]
 
 df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
 df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
+df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
 
 # Read geometry data
 df_link = read_table('tam_v0.abm_15_2_0.network__emme_hwy_tcad ', conn)
