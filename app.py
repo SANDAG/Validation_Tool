@@ -14,27 +14,25 @@ import dash_bootstrap_components as dbc
 
 
 # === Load data from conig_local ===
+if os.path.exists("config_local.py"):
+    ENV = "local"
+else:
+    ENV = "databricks"
+
+print(f"✅ Running in environment: {ENV}")
+
 # Detect environment
-ENV = os.getenv("APP_ENV", "local")
 if ENV == "local":
     from config_local import load_data
 else:
     from config_databricks import load_data
 
 data = load_data()
-df1 = data["df1"]
-df2 = data["df2"]
-df3 = data["df3"]
+df_filtered1 = data["df1"]
+df_filtered2 = data["df2"]
+df_filtered3 = data["df3"]
 geojson_data = data["geojson_data"]
 
-# === Filter columns for preview table ===
-# selected_columns = ['nm', 'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev', 'source','DAY_Flow','pmsa_nm','gap_day','hwycovid']
-df_filtered = df1.copy()
-df_filtered1 = df_filtered.dropna(subset=['count_day', 'DAY_Flow'])
-df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
-df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
-df_filtered3 = df3.copy()
-df_filtered3['Label'] = df_filtered3['fxnm'].fillna('Unknown') + ' to ' + df_filtered3['txnm'].fillna('Unknown')
 
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
