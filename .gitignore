@@ -4,3 +4,5 @@
 data/
 environment.yml
 config_local.py
+assets/
+__pycache__/
