@@ -1,104 +1,41 @@
-# ===== READING PACKAGE AND DATA PART =====
-# ===== BE CAREFUL EDITING THIS PART !!! =====
+import os
 import pandas as pd
-import numpy as np
 import dash
-from dash import Dash, dcc, html, dash_table, Input, Output, State, callback_context
+from dash import Dash, html, dash_table, dcc
+from dash import Input, Output, State
 import plotly.express as px
-import plotly.graph_objects as go
-import dash_leaflet as dl
-from functools import lru_cache
-from databricks import sql
-from databricks.sdk.core import Config
-from dash_extensions.javascript import assign
-import geopandas as gpd
-from shapely import wkt
 import json
-
-# Define Functions used to read data from volumes
-cfg = Config()
-
-@lru_cache(maxsize=1)
-def get_connection(http_path):
-    return sql.connect(
-        server_hostname=cfg.host,
-        http_path=http_path,
-        credentials_provider=lambda: cfg.authenticate,
-    )
-
-def read_volumes(volume_name, conn):
-    with conn.cursor() as cursor:
-        query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
-        cursor.execute(query)
-        return cursor.fetchall_arrow().to_pandas()
-
-def read_table(table_name, conn):
-    with conn.cursor() as cursor:
-        query = f"SELECT scenario_id,ID,Length,geometry as Shape FROM {table_name} WHERE scenario_id = 261"
-        cursor.execute(query)
-        return cursor.fetchall_arrow().to_pandas()
+import dash_leaflet as dl
+from dash_extensions.javascript import assign
+import numpy as np
+import plotly.graph_objects as go
+from dash import callback_context
+import dash_bootstrap_components as dbc
 
 
-# Read data
-http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
-conn = get_connection(http_path_input)
+# === Load data from conig_local ===
+# Detect environment
+ENV = os.getenv("APP_ENV", "local")
+if ENV == "local":
+    from config_local import load_data
+else:
+    from config_databricks import load_data
 
-df1 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
-df2 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
-df3 = read_volumes('/Volumes/tam_v0/abm_15_2_0/validation/vis_worksheet - fwy_spd_worksheet.csv', conn)
-df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
+data = load_data()
+df1 = data["df1"]
+df2 = data["df2"]
+df3 = data["df3"]
+geojson_data = data["geojson_data"]
+
+# === Filter columns for preview table ===
+# selected_columns = ['nm', 'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev', 'source','DAY_Flow','pmsa_nm','gap_day','hwycovid']
+df_filtered = df1.copy()
+df_filtered1 = df_filtered.dropna(subset=['count_day', 'DAY_Flow'])
 df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
 df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
 df_filtered3 = df3.copy()
 df_filtered3['Label'] = df_filtered3['fxnm'].fillna('Unknown') + ' to ' + df_filtered3['txnm'].fillna('Unknown')
 
-
-# Clean and Turn data to numeric data
-def clean_and_convert_columns(df, columns):
-    # Only keep columns that exist in the dataframe
-    existing_cols = [col for col in columns if col in df.columns]
-    missing_cols = [col for col in columns if col not in df.columns]
-
-    # Drop rows with NaN in any of the existing columns
-    df_cleaned = df.dropna(subset=existing_cols).copy()
-
-    # Convert to numeric for existing columns
-    for col in existing_cols:
-        df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
-
-    return df_cleaned
-
-columns_to_clean = [
-    'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev',
-    'EA_Flow', 'EA_Speed', 'EA_Vmt', 'AM_Flow', 'AM_Speed', 'AM_Vmt',
-    'MD_Flow', 'MD_Speed', 'MD_Vmt', 'PM_Flow', 'PM_Speed', 'PM_Vmt',
-    'EV_Flow', 'EV_Speed', 'EV_Vmt', 'DAY_Flow', 'DAY_Speed', 'DAY_Vmt',
-    'TruckFlow', 'lhdTruckFlow', 'mhdTruckFlow', 'hhdTruckFlow',
-    'vis_order', 'vmt_day', 'gap_day', 'vmt_gap_day',
-    'vmt_ea', 'gap_ea', 'vmt_gap_ea', 'vmt_am', 'gap_am', 'vmt_gap_am',
-    'vmt_md', 'gap_md', 'vmt_gap_md', 'vmt_pm', 'gap_pm', 'vmt_gap_pm',
-    'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day','length','speed_day','speed_ea',
-    'speed_am','speed_md','speed_pm','speed_ev'
-
-]
-
-df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
-df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
-df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
-
-# Read geometry data
-df_link = read_table('tam_v0.abm_15_2_0.network__emme_hwy_tcad ', conn)
-df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
-
-df_filtered1['hwycovid'] = df_filtered1['hwycovid'].astype(str)
-df_link['ID'] = df_link['ID'].astype(str)
-merged = df_filtered1.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
-merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:2230')
-merged = merged.to_crs('EPSG:4326')
-geojson_str = merged.to_json()
-geojson_data = json.loads(geojson_str)
-
-# ===== DASH BOARD DESIGN PART =====
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
 line_df['Label'] = line_df['fxnm'].fillna('Unknown') + ' to ' + line_df['txnm'].fillna('Unknown')
@@ -146,7 +83,7 @@ line_fig.update_layout(
         ticktext=line_df['Label'],
         tickfont=dict(size=8),
         showgrid=False,
-        range=[-0.9, len(line_df) - 0.9]  # 👈 eliminate extra padding
+        range=[-0.7, len(line_df) - 0.7]
     )
 )
 
@@ -246,15 +183,15 @@ style_function = assign("""function(feature, context) {
     if (isHighlighted) {
         return {
             color: 'yellow',
-            weight: 6,
+            weight: 7,
             opacity: 1.0
         };
     }
 
     return {
         color: color,
-        weight: 3,
-        opacity: 0.7
+        weight: 2,
+        opacity: 0.8
     };
 }""")
 
@@ -479,50 +416,70 @@ def page_volume_by_hwy():
                 options=corridor_options,
                 value=['ALL'], # Select all by default
                 inline=False,  # Display vertically
-                style={'overflowY': 'scroll', 'height': '600px'}  # Scroll if too many corridors
+                style={ 'height': '800px'}  # Scroll if too many corridors
             )
-        ], style={'width': '15%', 'padding': '10px', 'boxSizing': 'border-box'}),
+        ], style={'width': '10%', 'padding': '5px', 'boxSizing': 'border-box'}),
 
         html.Div([
             html.H3("Line Chart: Model vs Observed by Segment"),
 
         html.Div([
             html.Div([
-                html.Label("Time Period:"),
-                dcc.Dropdown(
-                    id='time_period_selector',
-                    options=[{'label': i, 'value': i} for i in ['EA', 'AM', 'MD', 'PM', 'EV', 'Day']],
-                    value='Day',
-                    clearable=False,
-                    style={'width': '150px'}
-                )
-            ], style={'marginRight': '20px'}),
+                html.Div([
+                    html.Label("Time Period:", style={'marginRight': '10px'}),
+                    dcc.Dropdown(
+                        id='time_period_selector',
+                        options=[{'label': i, 'value': i} for i in ['EA', 'AM', 'MD', 'PM', 'EV', 'Day']],
+                        value='Day',
+                        clearable=False,
+                        style={'width': '150px'}
+                    )
+                ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '20px'}),
 
-            html.Div([
-                html.Label("Metric:"),
-                dcc.Dropdown(
-                    id='matrix_selector',
-                    options=[
-                        {'label': 'Flow', 'value': 'Flow'},
-                        {'label': 'VMT', 'value': 'VMT'},
-                        {'label': 'Speed', 'value': 'Speed'}
-                    ],
-                    value='Flow',
-                    clearable=False,
-                    style={'width': '150px'}
-                )
-            ])
+                html.Div([
+                    html.Label("Y Axis Metric:", style={'marginRight': '10px'}),
+                    dcc.Dropdown(
+                        id='matrix_selector',
+                        options=[
+                            {'label': 'Flow', 'value': 'Flow'},
+                            {'label': 'VMT', 'value': 'VMT'},
+                            {'label': 'Speed', 'value': 'Speed'}
+                        ],
+                        value='Flow',
+                        clearable=False,
+                        style={'width': '150px'}
+                    )
+                ], style={'display': 'flex', 'alignItems': 'center'})
+            ], style={'display': 'flex'})
         ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
             html.Div([
-                dcc.Graph(id='line_plot', figure=line_fig, style={'height': '800px', 'minWidth': '1000px'})
-            ], style={'overflowX': 'auto', 'width': '100%'})
-        ], style={'width': '55%', 'padding': '10px', 'boxSizing': 'border-box'}),
+                dcc.Graph(id='line_plot', figure=line_fig, style={'height': '450px', 'minWidth': '1000px'})
+            ], style={'overflowX': 'auto', 'width': '100%'}),
+            html.Div([
+                html.Div([
+                    dash_table.DataTable(
+                        id='summary_table',
+                        columns=[],  # Will be set dynamically
+                        data=[],
+                        style_table={'overflowX': 'auto', 'maxHeight': '250px', 'overflowY': 'auto'},
+                        style_cell={'textAlign': 'center', 'padding': '5px'},
+                        style_header={'fontWeight': 'bold'}
+                    )
+                ], style={'width': '70%', 'padding': '10px','marginTop':'10px'}),
+
+                html.Div([
+                    dcc.Graph(id='dir_ring_graph', config={'displayModeBar': False}, style={'height': '250px'})
+                ], style={'width': '30%', 'padding': '10px'})
+            ], style={'display': 'flex', 'justifyContent': 'space-between','marginTop':'10px'})
+
+        ], style={'width': '60%', 'padding': '10px', 'boxSizing': 'border-box'}),
+
 
         html.Div([
             html.H3("Map: Gap Day by Hwy Coverage ID"),
             leaflet_map
-        ], style={'width': '30%', 'padding': '10px', 'boxSizing': 'border-box'})
-    ], style={'display': 'flex', 'width': '100%', 'height': '800px'})
+        ], style={'width': '30%', 'padding': '5px', 'boxSizing': 'border-box','height':'800px'})
+    ], style={'display': 'flex', 'width': '100%', 'height': '700px'})
 
 # === Define Page 3 Layout: VMT===
 def page_vmt_comparison():
@@ -669,17 +626,13 @@ def show_popup(clickData):
     props = clickData["properties"]
 
     return html.Div([
-        html.B(f"Segment: {props.get('nm', 'N/A')}"),
-        html.Br(),
         f"Hwy ID: {props.get('hwycovid', 'N/A')}",
         html.Br(),
-        f"Length: {round(props.get('length', 0), 2)} meters",
+        f"Volume Gap Day: {props.get('gap_day', 'N/A')}%",
         html.Br(),
-        f"Gap Day: {props.get('gap_day', 'N/A')}%",
+        f"VMT Gap Day: {props.get('vmt_gap_day', 'N/A')}%",
         html.Br(),
-        f"Model Flow: {props.get('DAY_Flow', 'N/A')}",
-        html.Br(),
-        f"Observed Count: {props.get('count_day', 'N/A')}"
+        f"Speed Gap Day: {props.get('speed_gap_day', 'N/A')}%"
     ])
 
 # === Map Highlight Callback ===
@@ -1091,8 +1044,8 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
     fig.update_layout(
         xaxis_title='Highway Segment',
         yaxis_title=selected_metric,
-        height=800,
-        width=max(1000, len(filtered_df) * 30),
+        height=600,
+        width=max(1000, len(filtered_df) * 20),
         margin=dict(l=20, r=20, t=5, b=5),
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
         xaxis=dict(
@@ -1109,6 +1062,60 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
 
     return fig
 
+#update table and ring graph in page 2 accoridng to matrix and corridor selected
+@app.callback(
+    Output('summary_table', 'columns'),
+    Output('summary_table', 'data'),
+    Output('dir_ring_graph', 'figure'),
+    Input('corridor_filter', 'value'),
+    Input('matrix_selector', 'value')
+)
+def update_table_and_ring(corridors, metric):
+    if metric == 'Speed':
+        df_base = df_filtered3.copy()
+        columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'speed_day', 'DAY_Speed']
+    else:
+        df_base = df_filtered1.copy()
+        columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'DAY_Flow', 'DAY_Vmt', 'vmt_day']
+
+    if not corridors or 'ALL' in corridors:
+        df_subset = df_base
+    else:
+        df_subset = df_base[df_base['nm'].isin(corridors)]
+
+    df_subset = df_subset[columns_to_show]
+
+    # Create table
+    columns = [{"name": col, "id": col} for col in df_subset.columns]
+    data = df_subset.to_dict('records')
+
+    # Ring chart for 'dir_nm'
+    # Group by source and drop NaNs
+    source_dist = df_subset['dir_nm'].dropna().value_counts().reset_index()
+    source_dist.columns = ['dir_nm', 'Count']
+    source_dist['Percent'] = round(100 * source_dist['Count'] / source_dist['Count'].sum())
+
+    direction_color_map = {
+        'NB': '#08306b',
+        'SB': '#F65166',
+        'EB': '#49C2D6',
+        'WB': '#F6C800'
+    }
+
+    # Assign colors
+    colors = [direction_color_map.get(dir_val, '#CCCCCC') for dir_val in source_dist['dir_nm']]
+
+    # Build pie chart (ring)
+    fig = go.Figure(go.Pie(
+        labels=source_dist['dir_nm'],
+        values=source_dist['Percent'],
+        hole=0.6,
+        textinfo='label+percent',
+        marker=dict(colors=colors)
+    ))
+    fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
+
+    return columns, data, fig
 
 # === Run App ===
 if __name__ == '__main__':
