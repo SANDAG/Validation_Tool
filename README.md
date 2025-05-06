@@ -6,4 +6,5 @@ Local test:
 3. Wait for page loading and then click the link in the ouput
 eg: 'Dash is running on http://127.0.0.1:8050/'
 
-![image](https://github.com/user-attachments/assets/fe802b55-0253-4d02-8891-f9175466f428)
+![image](https://github.com/user-attachments/assets/8ebcfe9b-28b7-44da-bd56-1887f4dbd4c9)
+
