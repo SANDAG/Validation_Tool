@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import dash
 from dash import Dash, html, dash_table, dcc
@@ -12,18 +13,23 @@ from dash import callback_context
 import dash_bootstrap_components as dbc
 
 
-# === Load Excel Sheets ===
-df = pd.read_excel("vis_worksheet.xlsx", sheet_name='fwy_worksheet')
-df2 = pd.read_excel("vis_worksheet.xlsx", sheet_name='allclass_worksheet')
-df3 = pd.read_excel("vis_worksheet.xlsx", sheet_name='fwy_spd_worksheet')
+# === Load data from conig_local ===
+# Detect environment
+ENV = os.getenv("APP_ENV", "local")
+if ENV == "local":
+    from config_local import load_data
+else:
+    from config_databricks import load_data
 
-# === Load GeoJSON ===
-with open("Joined_hwy_all.geojson", "r") as f:
-    geojson_data = json.load(f)
+data = load_data()
+df1 = data["df1"]
+df2 = data["df2"]
+df3 = data["df3"]
+geojson_data = data["geojson_data"]
 
 # === Filter columns for preview table ===
 # selected_columns = ['nm', 'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev', 'source','DAY_Flow','pmsa_nm','gap_day','hwycovid']
-df_filtered = df.copy()
+df_filtered = df1.copy()
 df_filtered1 = df_filtered.dropna(subset=['count_day', 'DAY_Flow'])
 df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
 df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
