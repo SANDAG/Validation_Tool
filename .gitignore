@@ -1,0 +1,8 @@
+# Ignore local and dev-specific files
+*.xlsx
+*.geojson
+data/
+environment.yml
+config_local.py
+assets/
+__pycache__/
