@@ -49,9 +49,11 @@ def load_data():
     df2 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
     df3 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_spd_worksheet.csv', conn)
 
-    df1['Label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
-    df2['Label'] = df2['fxnm'].fillna('Unknown') + ' to ' + df2['txnm'].fillna('Unknown')
-    df3['Label'] = df3['fxnm'].fillna('Unknown') + ' to ' + df3['txnm'].fillna('Unknown')
+    df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
+    df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
+    df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
+    df_filtered3 = df3.copy()
+    df_filtered3['Label'] = df_filtered3['fxnm'].fillna('Unknown') + ' to ' + df_filtered3['txnm'].fillna('Unknown')
 
     columns_to_clean = [
         'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev',
@@ -66,9 +68,9 @@ def load_data():
         'length','speed_day','speed_ea','speed_am','speed_md','speed_pm','speed_ev'
     ]
 
-    df_filtered1 = clean_and_convert_columns(df1, columns_to_clean)
-    df_filtered2 = clean_and_convert_columns(df2, columns_to_clean)
-    df_filtered3 = clean_and_convert_columns(df3, columns_to_clean)
+    df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
+    df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
+    df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
 
     df_link = read_table('tam.abm_15_2_0.network__emme_hwy_tcad ', conn)
     df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
@@ -83,8 +85,8 @@ def load_data():
     geojson_data = json.loads(geojson_str)
 
     return {
-        "df": df1,
-        "df2": df2,
-        "df3": df3,
+        "df1": df_filtered1,
+        "df2": df_filtered2,
+        "df3": df_filtered3,
         "geojson_data": geojson_data
     }
