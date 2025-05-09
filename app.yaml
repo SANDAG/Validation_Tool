@@ -6,5 +6,3 @@ packages: file:requirements.txt
 env:
   - name: 'ENV'
     value: 'databricks'
-  - name: 'DATABRICKS_WAREHOUSE_ID'
-    valueFrom: 'sql-warehouse'
