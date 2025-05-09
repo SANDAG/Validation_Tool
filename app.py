@@ -13,10 +13,10 @@ from dash import callback_context
 import dash_bootstrap_components as dbc
 
 # === Load data from conig_local ===
-if os.path.exists("config_local.py"):
-    ENV = "local"
-else:
+if "DATABRICKS_HOST" in os.environ:
     ENV = "databricks"
+else:
+    ENV = "local"
 
 print(f"✅ Running in environment: {ENV}")
 
