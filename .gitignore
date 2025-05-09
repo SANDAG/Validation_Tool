@@ -1,0 +1,4 @@
+# Ignore archive and local-only folders
+local_archive/
+assets/
+__pycache__/
