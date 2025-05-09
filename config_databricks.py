@@ -47,13 +47,10 @@ def load_data():
 
     df1 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
     df2 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
-    df3 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_spd_worksheet.csv', conn)
 
     df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
     df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
     df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
-    df_filtered3 = df3.copy()
-    df_filtered3['Label'] = df_filtered3['fxnm'].fillna('Unknown') + ' to ' + df_filtered3['txnm'].fillna('Unknown')
 
     columns_to_clean = [
         'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev',
@@ -70,14 +67,13 @@ def load_data():
 
     df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
     df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
-    df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
 
     df_link = read_table('tam.abm_15_2_0.network__emme_hwy_tcad ', conn)
     df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
 
     df_filtered1['hwycovid'] = df_filtered1['hwycovid'].astype(str)
     df_link['ID'] = df_link['ID'].astype(str)
-    merged = df_filtered1.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
+    merged = df_filtered2.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
 
     merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:2230')
     merged = merged.to_crs('EPSG:4326')
@@ -87,6 +83,5 @@ def load_data():
     return {
         "df1": df_filtered1,
         "df2": df_filtered2,
-        "df3": df_filtered3,
         "geojson_data": geojson_data
     }
