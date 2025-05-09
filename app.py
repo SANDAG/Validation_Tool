@@ -29,7 +29,6 @@ else:
 data = load_data()
 df_filtered1 = data["df1"]
 df_filtered2 = data["df2"]
-df_filtered3 = data["df3"]
 geojson_data = data["geojson_data"]
 
 
@@ -439,8 +438,7 @@ def page_volume_by_hwy():
                         id='matrix_selector',
                         options=[
                             {'label': 'Flow', 'value': 'Flow'},
-                            {'label': 'VMT', 'value': 'VMT'},
-                            {'label': 'Speed', 'value': 'Speed'}
+                            {'label': 'VMT', 'value': 'VMT'}
                         ],
                         value='Flow',
                         clearable=False,
@@ -969,10 +967,7 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
 )
 def update_line_chart(selected_corridors, selected_period, selected_metric):
     # Choose correct DataFrame
-    if selected_metric == 'Speed':
-        base_df = df_filtered3.copy()  # This must be defined earlier in the script
-    else:
-        base_df = df_filtered1.copy()
+    base_df = line_df.copy()
 
     # Filter corridor
     if not selected_corridors:
@@ -1068,12 +1063,8 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
     Input('matrix_selector', 'value')
 )
 def update_table_and_ring(corridors, metric):
-    if metric == 'Speed':
-        df_base = df_filtered3.copy()
-        columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'speed_day', 'DAY_Speed']
-    else:
-        df_base = df_filtered1.copy()
-        columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'DAY_Flow', 'DAY_Vmt', 'vmt_day']
+    df_base = df_filtered1.copy()
+    columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'DAY_Flow', 'DAY_Vmt', 'vmt_day']
 
     if not corridors or 'ALL' in corridors:
         df_subset = df_base
