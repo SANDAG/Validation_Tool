@@ -20,15 +20,15 @@ def get_connection(http_path):
         credentials_provider=lambda: cfg.authenticate,
     )
 
-# def read_volumes(volume_name, conn):
-#     with conn.cursor() as cursor:
-#         query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
-#         cursor.execute(query)
-#         return cursor.fetchall_arrow().to_pandas()
+def read_volumes(volume_name, conn):
+    with conn.cursor() as cursor:
+        query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
+        cursor.execute(query)
+        return cursor.fetchall_arrow().to_pandas()
 
 def read_geotable(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name} WHERE scenario_id = 261"
+        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name} WHERE scenario_id = 1150"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -51,8 +51,8 @@ def load_data():
     http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
     conn = get_connection(http_path_input)
 
-    df1 = read_table('tam_dev.validation.fwy', conn)
-    df2 = read_table('tam_dev.validation.all_calss', conn)
+    df1 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
+    df2 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
 
     df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
     df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
@@ -74,10 +74,10 @@ def load_data():
     df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
     df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
 
-    df_link = read_geotable('tam.abm_15_2_0.network__emme_hwy_tcad ', conn)
+    df_link = read_geotable('tam_dev.abm3.network__emme_hwy_tcad ', conn)
     df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
 
-    df_filtered1['hwycovid'] = df_filtered1['hwycovid'].astype(str)
+    df_filtered2['hwycovid'] = df_filtered2['hwycovid'].astype(str)
     df_link['ID'] = df_link['ID'].astype(str)
     merged = df_filtered2.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
 
