@@ -28,13 +28,13 @@ def read_volumes(volume_name, conn):
 
 def read_geotable(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name} WHERE scenario_id = 1150"
+        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name}"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name} WHERE scenario_id = 1150"
+        query = f"SELECT * FROM {table_name}"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 

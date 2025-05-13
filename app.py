@@ -23,15 +23,30 @@ print(f"✅ Running in environment: {ENV}")
 # Detect environment
 if ENV == "local":
     from config_local import load_data
+
 else:
     from config_databricks import load_data
 
 data = load_data()
-df_filtered1 = data["df1"]
-df_filtered2 = data["df2"]
-geojson_data = data["geojson_data"]
-df_filtered1.columns = df_filtered1.columns.str.lower()
-df_filtered2.columns = df_filtered2.columns.str.lower()
+df_all_1 = data['df1']
+df_all_2 = data['df2']
+geojson_all = data['geojson_data']
+
+if 'scenario_id' in df_all_1.columns:
+    default_scenario = 1150
+    df_filtered1 = df_all_1[df_all_1['scenario_id'] == default_scenario].copy()
+    df_filtered2 = df_all_2[df_all_2['scenario_id'] == default_scenario].copy()
+    geojson_data = {
+        **geojson_all,
+        'features': [f for f in geojson_all['features'] if f['properties'].get('scenario_id') == default_scenario]
+    }
+    SCENARIO_ENABLED = True
+else:
+    df_filtered1 = df_all_1.copy()
+    df_filtered2 = df_all_2.copy()
+    geojson_data = geojson_all
+    SCENARIO_ENABLED = False
+
 
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
@@ -542,7 +557,15 @@ def page_vmt_comparison():
 # === Full App Layout with Collapsible Sidebar ===
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-
+    html.Div(id='selector-container', children=[
+        dcc.Dropdown(
+            id='scenario-selector',
+            options=[{'label': str(i), 'value': i} for i in sorted(df_all_1['scenario_id'].unique())] if SCENARIO_ENABLED else [],
+            value=1150 if SCENARIO_ENABLED else None,
+            clearable=False,
+            style={'width': '300px'}
+        )
+    ]) if SCENARIO_ENABLED else html.Div("Running locally (scenario selection disabled).", style={'marginLeft': '100px','fontSize': '14px'}),
 html.Div([
     html.Button("☰ Menu", id="menu-button", n_clicks=0, style={
         'position': 'fixed',
@@ -575,6 +598,16 @@ html.Div([
 ])
 
 
+@app.callback(
+    Output('dummy-output', 'children'),  # dummy to trigger
+    Input('scenario-selector', 'value'),
+    prevent_initial_call=True
+)
+def update_global_data(selected_scenario):
+    global df_filtered1, df_filtered2, geojson_data
+
+    if not SCENARIO_ENABLED:
+            return "Scenario selector not available in local mode."
 
 
 # === Page Router Callback ===
