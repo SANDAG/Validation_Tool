@@ -77,9 +77,9 @@ def load_data():
     df_link = read_geotable('tam_dev.abm3.network__emme_hwy_tcad ', conn)
     df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
 
-    df_filtered2['hwycovid'] = df_filtered2['hwycovid'].astype(str)
+    df_filtered2['hwycovid_str'] = df_filtered2['hwycovid'].astype(str)
     df_link['ID'] = df_link['ID'].astype(str)
-    merged = df_filtered2.merge(df_link, left_on='hwycovid', right_on='ID', how='left')
+    merged = df_filtered2.merge(df_link, left_on='hwycovid_str', right_on='ID', how='left')
 
     merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:2230')
     merged = merged.to_crs('EPSG:4326')
