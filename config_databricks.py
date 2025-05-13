@@ -11,6 +11,7 @@ from databricks.sdk.core import Config
 
 # === Connection setup ===
 cfg = Config()
+SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
 
 @lru_cache(maxsize=1)
 def get_connection(http_path):
@@ -34,7 +35,7 @@ def read_geotable(table_name, conn):
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name} WHERE scenario_id = 1150"
+        query = f"SELECT * FROM {table_name} WHERE scenario_id = {SCENARIO_ID}"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
