@@ -34,7 +34,7 @@ def read_geotable(table_name, conn):
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name}"
+        query = f"SELECT * FROM {table_name} WHERE scenario_id = 1150"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -51,24 +51,24 @@ def load_data():
     http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
     conn = get_connection(http_path_input)
 
-    df1 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - fwy_worksheet.csv', conn)
-    df2 = read_volumes('/Volumes/tam/abm_15_2_0/validation/vis_worksheet - allclass_worksheet.csv', conn)
+    df1 = read_table('tam_dev.validation.fwy', conn)
+    df2 = read_table('tam_dev.validation.all_class', conn)
 
-    df_filtered1 = df1.dropna(subset=['count_day', 'DAY_Flow'])
+    df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'])
     df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
-    df_filtered2 = df2.dropna(subset=['count_day', 'DAY_Flow'])
+    df_filtered2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'])
 
     columns_to_clean = [
         'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev',
-        'EA_Flow', 'EA_Speed', 'EA_Vmt', 'AM_Flow', 'AM_Speed', 'AM_Vmt',
-        'MD_Flow', 'MD_Speed', 'MD_Vmt', 'PM_Flow', 'PM_Speed', 'PM_Vmt',
-        'EV_Flow', 'EV_Speed', 'EV_Vmt', 'DAY_Flow', 'DAY_Speed', 'DAY_Vmt',
-        'TruckFlow', 'lhdTruckFlow', 'mhdTruckFlow', 'hhdTruckFlow',
+        'ea_flow', 'ea_speed', 'ea_vmt', 'am_flow', 'am_speed', 'am_vmt',
+        'md_flow', 'md_speed', 'md_vmt', 'pm_flow', 'pm_speed', 'pm_vmt',
+        'ev_flow', 'ev_speed', 'ev_vmt', 'day_flow', 'day_speed', 'day_vmt',
+        'truckflow', 'lhdtruckflow', 'mhdtruckflow', 'hhdtruckflow',
         'vis_order', 'vmt_day', 'gap_day', 'vmt_gap_day',
         'vmt_ea', 'gap_ea', 'vmt_gap_ea', 'vmt_am', 'gap_am', 'vmt_gap_am',
         'vmt_md', 'gap_md', 'vmt_gap_md', 'vmt_pm', 'gap_pm', 'vmt_gap_pm',
-        'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'DAY_Vmt', 'vmt_day',
-        'length','speed_day','speed_ea','speed_am','speed_md','speed_pm','speed_ev'
+        'vmt_ev', 'gap_ev', 'vmt_gap_ev', 'day_vmt', 'vmt_day',
+        'length', 'speed_day', 'speed_ea', 'speed_am', 'speed_md', 'speed_pm', 'speed_ev'
     ]
 
     df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)

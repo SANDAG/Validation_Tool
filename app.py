@@ -1,4 +1,3 @@
-#Load packages
 import os
 import pandas as pd
 import dash
@@ -13,7 +12,7 @@ import plotly.graph_objects as go
 from dash import callback_context
 import dash_bootstrap_components as dbc
 
-# === Detect environment and load data ===
+# === Load data from conig_local ===
 if "DATABRICKS_HOST" in os.environ:
     ENV = "databricks"
 else:
@@ -21,6 +20,7 @@ else:
 
 print(f"✅ Running in environment: {ENV}")
 
+# Detect environment
 if ENV == "local":
     from config_local import load_data
 else:
@@ -30,7 +30,8 @@ data = load_data()
 df_filtered1 = data["df1"]
 df_filtered2 = data["df2"]
 geojson_data = data["geojson_data"]
-
+df_filtered1.columns = df_filtered1.columns.str.lower()
+df_filtered2.columns = df_filtered2.columns.str.lower()
 
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
@@ -43,7 +44,7 @@ line_fig = go.Figure()
 
 line_fig.add_trace(go.Scatter(
     x=line_df['hwycovid'],
-    y=line_df['DAY_Flow'],
+    y=line_df['day_flow'],
     customdata=line_df[['hwycovid']],
     mode='lines+markers',
     name='Model DAY_Flow',
@@ -84,9 +85,9 @@ line_fig.update_layout(
 )
 
 # === Scatter Plot: count_day vs DAY_Flow ===
-scatter_df = df_filtered2[['count_day', 'DAY_Flow','hwycovid']].dropna()
+scatter_df = df_filtered2[['count_day', 'day_flow','hwycovid']].dropna()
 x = scatter_df['count_day']
-y = scatter_df['DAY_Flow']
+y = scatter_df['day_flow']
 slope, intercept = np.polyfit(x, y, 1)
 line_x = np.linspace(x.min(), x.max(), 100)
 line_y = slope * line_x + intercept
@@ -95,9 +96,9 @@ r_squared = 1 - np.sum((y - (slope * x + intercept)) ** 2) / np.sum((y - y.mean(
 scatter_fig = px.scatter(
     scatter_df,
     x='count_day',
-    y='DAY_Flow',
+    y='day_flow',
     custom_data=['hwycovid'],
-    labels={'count_day': 'Observed Count', 'DAY_Flow': 'Model Flow'},
+    labels={'count_day': 'Observed Count', 'day_flow': 'Model Flow'},
     color_discrete_sequence=["#08306b"],
     opacity=0.6
 )
@@ -120,7 +121,7 @@ results = []
 
 for pmsa, group in df_filtered2.groupby('pmsa_nm'):
     x = pd.to_numeric(group['count_day'], errors='coerce')
-    y = pd.to_numeric(group['DAY_Flow'], errors='coerce')
+    y = pd.to_numeric(group['day_flow'], errors='coerce')
     
     mask = ~np.isnan(x) & ~np.isnan(y)
     x_clean = x[mask]
@@ -253,7 +254,7 @@ leaflet_map = dl.Map(
 
 # === Compute Overall Stats for Display ===
 x_all = pd.to_numeric(df_filtered2['count_day'], errors='coerce')
-y_all = pd.to_numeric(df_filtered2['DAY_Flow'], errors='coerce')
+y_all = pd.to_numeric(df_filtered2['day_flow'], errors='coerce')
 mask_all = ~np.isnan(x_all) & ~np.isnan(y_all)
 x_clean_all = x_all[mask_all]
 y_clean_all = y_all[mask_all]
@@ -309,9 +310,9 @@ def page_volume_validation():
                         {'label': 'By PMSA', 'value': 'pmsa_nm'},
                         {'label': 'By City', 'value': 'city_nm'},
                         {'label': 'By Volume Category', 'value': 'vcategory'},
-                        {'label': 'By Road Class', 'value': 'rdClass'}
+                        {'label': 'By Road Class', 'value': 'rdclass'}
                     ],
-                    value='rdClass',
+                    value='rdclass',
                     clearable=False,
                     style={'width': '200px'}
                 )
@@ -484,19 +485,19 @@ def page_vmt_comparison():
         df_vmt = df_filtered2.copy()
 
         # Group and rename
-        grouped = df_vmt.groupby(group_col)[['DAY_Vmt', 'vmt_day']].sum().reset_index()
+        grouped = df_vmt.groupby(group_col)[['day_vmt', 'vmt_day']].sum().reset_index()
         grouped = grouped.rename(columns={group_col: 'Group'})
 
         # Melt in desired order: vmt_day (Observed) first
         melted = grouped.melt(
             id_vars='Group',
-            value_vars=['vmt_day', 'DAY_Vmt'],
+            value_vars=['vmt_day', 'day_vmt'],
             var_name='Source',
             value_name='VMT'
         )
 
         # Map to display labels
-        label_map = {'vmt_day': 'Observed VMT', 'DAY_Vmt': 'Model VMT'}
+        label_map = {'vmt_day': 'Observed VMT', 'day_vmt': 'Model VMT'}
         color_map = {'Observed VMT': '#F65166', 'Model VMT': '#08306b'}
         melted['Source'] = melted['Source'].map(label_map)
         fig = px.bar(
@@ -531,7 +532,7 @@ def page_vmt_comparison():
             # Row 2
             html.Div([
                 dcc.Graph(figure=make_vmt_fig('city_nm', 'By City'), style={'width': '50%', 'height': '100%'}),
-                dcc.Graph(figure=make_vmt_fig('rdClass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
+                dcc.Graph(figure=make_vmt_fig('rdclass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
             ], style={'display': 'flex', 'height': '50%'})
         ], style={'height': 'calc(100vh - 80px)'})  # Adjust to exclude H2 + padding
     ], style={'padding': '10px', 'height': '100vh', 'boxSizing': 'border-box',})
@@ -716,7 +717,7 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
 
     for group_val, group in df_filtered2.groupby(groupby_col):
         x = pd.to_numeric(group['count_day'], errors='coerce')
-        y = pd.to_numeric(group['DAY_Flow'], errors='coerce')
+        y = pd.to_numeric(group['day_flow'], errors='coerce')
         mask = ~np.isnan(x) & ~np.isnan(y)
         x_clean = x[mask]
         y_clean = y[mask]
@@ -842,7 +843,7 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
         sub_df = df_filtered2
 
     x_all = pd.to_numeric(sub_df['count_day'], errors='coerce')
-    y_all = pd.to_numeric(sub_df['DAY_Flow'], errors='coerce')
+    y_all = pd.to_numeric(sub_df['day_flow'], errors='coerce')
     mask_all = ~np.isnan(x_all) & ~np.isnan(y_all)
     x_clean_all = x_all[mask_all]
     y_clean_all = y_all[mask_all]
@@ -869,13 +870,13 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
     # === Scatter plot ===
     # Fix scatter filtering
     if selected_group:
-        scatter_df = df_filtered2[df_filtered2[groupby_col] == selected_group][['count_day', 'DAY_Flow', 'hwycovid']].dropna()
+        scatter_df = df_filtered2[df_filtered2[groupby_col] == selected_group][['count_day', 'day_flow', 'hwycovid']].dropna()
     else:
-        scatter_df = df_filtered2[['count_day', 'DAY_Flow', 'hwycovid']].dropna()
+        scatter_df = df_filtered2[['count_day', 'day_flow', 'hwycovid']].dropna()
 
      # Regression line
     x = scatter_df['count_day']
-    y = scatter_df['DAY_Flow']
+    y = scatter_df['day_flow']
     slope, intercept = np.polyfit(x, y, 1)
     line_x = np.linspace(x.min(), x.max(), 100)
     line_y = slope * line_x + intercept
@@ -886,7 +887,7 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
     # Add points first
     scatter_fig.add_trace(go.Scatter(
         x=scatter_df['count_day'],
-        y=scatter_df['DAY_Flow'],
+        y=scatter_df['day_flow'],
         mode='markers',
         name='Paired Data Point',
         marker=dict(size=7, color='#08306b', opacity=0.5),
@@ -985,13 +986,11 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
             'Speed': 'speed_day'
         }[selected_metric]
         model_col = {
-            'Flow': 'DAY_Flow',
-            'VMT': 'DAY_Vmt',
-            'Speed': 'DAY_Speed'
+            'Flow': 'day_flow',
+            'VMT': 'day_vmt',
         }[selected_metric]
     else:
         period_lc = selected_period.lower()
-        period_uc = selected_period.upper()
 
         obs_col = {
             'Flow': f'count_{period_lc}',
@@ -1000,9 +999,9 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
         }[selected_metric]
 
         model_col = {
-            'Flow': f'{period_uc}_Flow',
-            'VMT': f'{period_uc}_Vmt',
-            'Speed': f'{period_uc}_Speed'
+            'Flow': f'{period_lc}_flow',
+            'VMT': f'{period_lc}_vmt',
+            'Speed': f'{period_lc}_speed'
         }[selected_metric]
 
 
@@ -1064,7 +1063,7 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
 )
 def update_table_and_ring(corridors, metric):
     df_base = df_filtered1.copy()
-    columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'DAY_Flow', 'DAY_Vmt', 'vmt_day']
+    columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'day_flow', 'day_vmt', 'vmt_day']
 
     if not corridors or 'ALL' in corridors:
         df_subset = df_base
