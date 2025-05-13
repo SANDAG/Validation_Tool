@@ -1,3 +1,4 @@
+#Load packages
 import os
 import pandas as pd
 import dash
@@ -12,7 +13,7 @@ import plotly.graph_objects as go
 from dash import callback_context
 import dash_bootstrap_components as dbc
 
-# === Load data from conig_local ===
+# === Detect environment and load data ===
 if "DATABRICKS_HOST" in os.environ:
     ENV = "databricks"
 else:
@@ -20,7 +21,6 @@ else:
 
 print(f"✅ Running in environment: {ENV}")
 
-# Detect environment
 if ENV == "local":
     from config_local import load_data
 else:
