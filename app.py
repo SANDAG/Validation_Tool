@@ -130,7 +130,6 @@ scatter_fig.add_trace(go.Scatter(
     line=dict(color='#F65166', dash='dash',width=3)
 ))
 
-
 # === Calculate R² slope and PRMSE per PMSA ===
 results = []
 
