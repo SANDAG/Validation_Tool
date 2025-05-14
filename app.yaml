@@ -6,5 +6,5 @@ packages: file:requirements.txt
 env:
   - name: 'ENV'
     value: 'databricks'
-env_vars:
-  SCENARIO_ID: "1150"
+  - name: 'SCENARIO_ID'
+    value: '254'

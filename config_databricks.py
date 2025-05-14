@@ -11,7 +11,6 @@ from databricks.sdk.core import Config
 
 # === Connection setup ===
 cfg = Config()
-SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
 
 @lru_cache(maxsize=1)
 def get_connection(http_path):
@@ -29,14 +28,13 @@ def read_volumes(volume_name, conn):
 
 def read_geotable(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name}"
+        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name} WHERE scenario_id = 1150"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
-def read_table(table_name, conn):
+def read_table(table_name, conn, scenario_id):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name} WHERE scenario_id = {SCENARIO_ID}"
->>>>>>> origin/main
+        query = f"SELECT * FROM {table_name} WHERE scenario_id = {scenario_id}"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -50,11 +48,13 @@ def clean_and_convert_columns(df, columns):
 
 # === Main function ===
 def load_data():
+    SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
+    print(f"🔍 Using SCENARIO_ID: {SCENARIO_ID}") 
     http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
     conn = get_connection(http_path_input)
 
-    df1 = read_table('tam_dev.validation.fwy', conn)
-    df2 = read_table('tam_dev.validation.all_class', conn)
+    df1 = read_table('tam_dev.validation.fwy', conn,SCENARIO_ID)
+    df2 = read_table('tam_dev.validation.all_class', conn,SCENARIO_ID)
 
     df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'])
     df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
