@@ -23,7 +23,7 @@ print(f"✅ Running in environment: {ENV}")
 # Detect environment
 if ENV == "local":
     from config_local import load_data
-    scenario_id = 1150
+    scenario_id = 261
 else:
     from config_databricks import load_data
     scenario_id = int(os.getenv("SCENARIO_ID", "1150"))
@@ -31,9 +31,10 @@ else:
 data = load_data()
 df_filtered1 = data["df1"]
 df_filtered2 = data["df2"]
+df3 =  data["df3"]
+df4 =  data["df4"]
 geojson_data = data["geojson_data"]
-df_filtered1.columns = df_filtered1.columns.str.lower()
-df_filtered2.columns = df_filtered2.columns.str.lower()
+
 
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
@@ -303,6 +304,21 @@ source_fig = go.Figure(go.Pie(
 def page_volume_validation():
     return html.Div([
         html.Div([
+            html.Div([
+                html.Div("Select Vehicle Type:", style={'marginRight': '10px', 'fontWeight': 'bold'}),
+                dcc.Dropdown(
+                id='vehicle_class_selector',
+                options=[
+                    {'label': 'All Class', 'value': 'all'},
+                    {'label': 'Truck', 'value': 'truck'},
+                    {'label': 'LHD Truck', 'value': 'lhd'},
+                    {'label': 'MHD Truck', 'value': 'mhd'},
+                    {'label': 'HHD Truck', 'value': 'hhd'}
+                ],
+                value='all',
+                clearable=False,
+                style={'width': '200px', 'marginRight': '10px'}
+            )],style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'}),
             html.Div([
                 html.H3("R² and Slope", style={'marginRight': '20px'}),
                 dcc.Dropdown(
@@ -685,13 +701,32 @@ from plotly import graph_objects as go
     Input('bar_fig2', 'clickData'),
     Input('count_fig', 'clickData'),
     Input('groupby_selector', 'value'),
+    Input('vehicle_class_selector', 'value'),  # new
     State('bar_fig', 'figure'),
     prevent_initial_call=False
 )
-
-def update_all(click1, click2, click3, groupby_col, current_fig1):
+def update_all(click1, click2, click3, groupby_col, vehicle_class, current_fig1):
     ctx = callback_context
     trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+
+    # Select correct data and columns
+    if vehicle_class == 'all':
+        df = df_filtered2.copy()
+        model_col, obs_col = 'day_flow', 'count_day'
+    elif vehicle_class == 'truck':
+        df = df3.copy()
+        model_col, obs_col = 'truckflow', 'truckaadt'
+    elif vehicle_class == 'lhd':
+        df = df3.copy()
+        model_col, obs_col = 'lhdtruckflow', 'lhdtruckaadt'
+    elif vehicle_class == 'mhd':
+        df = df3.copy()
+        model_col, obs_col = 'mhdtruckflow', 'mhdtruckaadt'
+    elif vehicle_class == 'hhd':
+        df = df3.copy()
+        model_col, obs_col = 'hhdtruckflow', 'hhdtruckaadt'
+    else:
+        return dash.no_update
 
     # Get x-axis fixed order
     if current_fig1 and 'data' in current_fig1 and len(current_fig1['data']) > 0:
@@ -699,6 +734,7 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
     else:
         x_axis_fixed = None
 
+    # Determine selected group
     selected_group = None
     clicked = ctx.triggered[0]['value']
     if trigger in ['bar_fig', 'bar_fig2', 'count_fig'] and clicked and 'points' in clicked:
@@ -711,36 +747,24 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
     else:
         update_all.last_selected = None
 
-    # Prepare data
-    results = []
-    count_results = []
-
-    for group_val, group in df_filtered2.groupby(groupby_col):
-        x = pd.to_numeric(group['count_day'], errors='coerce')
-        y = pd.to_numeric(group['day_flow'], errors='coerce')
+    # Bar chart stats (R², slope, PRMSE)
+    results, count_results = [], []
+    for group_val, group in df.groupby(groupby_col):
+        x = pd.to_numeric(group[obs_col], errors='coerce')
+        y = pd.to_numeric(group[model_col], errors='coerce')
         mask = ~np.isnan(x) & ~np.isnan(y)
-        x_clean = x[mask]
-        y_clean = y[mask]
+        x_clean, y_clean = x[mask], y[mask]
 
         if len(x_clean) > 1:
             slope, intercept = np.polyfit(x_clean, y_clean, 1)
             y_pred = slope * x_clean + intercept
             r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
             rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
-            mean_obs = np.mean(y_clean)
-            prmse = (rmse / mean_obs) * 100 if mean_obs != 0 else np.nan
+            prmse = (rmse / y_clean.mean()) * 100 if y_clean.mean() != 0 else np.nan
+            results.append({'Group': group_val, 'R_squared': round(r_squared, 2),
+                            'Slope': round(slope, 2), 'PRMSE': round(prmse, 2)})
 
-            results.append({
-                'Group': group_val,
-                'R_squared': round(r_squared, 2),
-                'Slope': round(slope, 2),
-                'PRMSE': round(prmse, 2)
-            })
-
-        count_results.append({
-            'Group': group_val,
-            'Num_Observed': len(group)
-        })
+        count_results.append({'Group': group_val, 'Num_Observed': len(group)})
 
     result_df = pd.DataFrame(results)
     count_df = pd.DataFrame(count_results)
@@ -748,217 +772,104 @@ def update_all(click1, click2, click3, groupby_col, current_fig1):
     if x_axis_fixed is None:
         x_axis_fixed = list(result_df['Group'])
 
-    # === Bar 1: R² and Slope
-    fig1 = go.Figure()
-
-    # Build data separately
-    opacity_val_r2 = 1
-    opacity_val_slope = 1
-
-    if selected_group:
-        opacity_list_r2 = [1 if g == selected_group else 0.3 for g in result_df['Group']]
-        opacity_list_slope = [1 if g == selected_group else 0.3 for g in result_df['Group']]
-    else:
-        opacity_list_r2 = [1 for _ in result_df['Group']]
-        opacity_list_slope = [1 for _ in result_df['Group']]
-
-    # Now add one trace for R_squared
-    fig1.add_trace(go.Bar(
-        x=result_df['Group'],
-        y=result_df['R_squared'],
-        name='R_squared',
-        marker_color='#08306b',
-        marker=dict(opacity=opacity_list_r2),  # control opacity INSIDE marker not at trace level
-    ))
-
-    # And one trace for Slope
-    fig1.add_trace(go.Bar(
-        x=result_df['Group'],
-        y=result_df['Slope'],
-        name='Slope',
-        marker_color='#F65166',
-        marker=dict(opacity=opacity_list_slope),
-    ))
-
-    fig1.update_layout(
-        barmode='group',
-        bargap=0.2,
-        bargroupgap=0.05,
-        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
-        yaxis_range=[0, 1.5],
-        legend=dict(orientation='h', yanchor='bottom', y=1.1, xanchor='left', x=0),
-        margin=dict(t=0, b=0, l=0, r=0),
-    )
-
-    # === Bar 2: PRMSE
-    fig2 = go.Figure()
-
-    for idx, row in result_df.iterrows():
-        opacity_val = 1
-        if selected_group:
-            opacity_val = 1 if row['Group'] == selected_group else 0.3
-        fig2.add_trace(go.Bar(
-            x=[row['Group']],
-            y=[row['PRMSE']],
-            marker_color='#08306b',
-            opacity=opacity_val,
+    # === Bar Charts ===
+    def build_bar_chart(metric, color):
+        return go.Figure([
+            go.Bar(
+                x=result_df['Group'],
+                y=result_df[metric],
+                marker_color=color,
+                marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']]),
+                name=metric
+            )
+        ]).update_layout(
+            barmode='group',
+            xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+            margin=dict(t=0, b=0, l=0, r=0),
+            yaxis_range=[0, 1.5 if metric == 'R_squared' else result_df[metric].max() * 1.2],
             showlegend=False
-        ))
+        )
 
-    fig2.update_layout(
-        barmode='group',
-        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
-        yaxis_range=[0, result_df['PRMSE'].max() * 1.2],
-        showlegend=False,
-        margin=dict(t=0, b=0, l=0, r=0),
-    )
+    bar_fig = go.Figure()
+    bar_fig.add_trace(go.Bar(
+        x=result_df['Group'], y=result_df['R_squared'], name='R²', marker_color='#08306b',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    bar_fig.add_trace(go.Bar(
+        x=result_df['Group'], y=result_df['Slope'], name='Slope', marker_color='#F65166',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    bar_fig.update_layout(barmode='group', margin=dict(t=0, b=0, l=0, r=0),
+                          xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed))
 
-    # === Bar 3: Number of Observed Counts
-    fig3 = go.Figure()
-
+    bar_fig2 = build_bar_chart('PRMSE', '#08306b')
+    count_fig = go.Figure()
     for idx, row in count_df.iterrows():
-        opacity_val = 1
-        if selected_group:
-            opacity_val = 1 if row['Group'] == selected_group else 0.3
-        fig3.add_trace(go.Bar(
+        op = 1 if row['Group'] == selected_group or selected_group is None else 0.3
+        count_fig.add_trace(go.Bar(
             x=[row['Group']],
             y=[row['Num_Observed']],
             marker_color='#08306b',
-            opacity=opacity_val,
+            opacity=op,
             showlegend=False
         ))
-
-    fig3.update_layout(
-        barmode='group',
-        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
-        yaxis_range=[0, count_df['Num_Observed'].max() * 1.2],
-        showlegend=False,
+    count_fig.update_layout(
         margin=dict(t=0, b=0, l=0, r=0),
+        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+        showlegend=False
     )
 
-    # === Filtered data for stats and source
+    # === Scatter Plot ===
     if selected_group:
-        sub_df = df_filtered2[df_filtered2[groupby_col] == selected_group]
+        sub_df = df[df[groupby_col] == selected_group]
     else:
-        sub_df = df_filtered2
+        sub_df = df
 
-    x_all = pd.to_numeric(sub_df['count_day'], errors='coerce')
-    y_all = pd.to_numeric(sub_df['day_flow'], errors='coerce')
-    mask_all = ~np.isnan(x_all) & ~np.isnan(y_all)
-    x_clean_all = x_all[mask_all]
-    y_clean_all = y_all[mask_all]
-
-    slope_all, intercept_all = np.polyfit(x_clean_all, y_clean_all, 1)
-    y_pred_all = slope_all * x_clean_all + intercept_all
-    r_squared_all = 1 - np.sum((y_clean_all - y_pred_all) ** 2) / np.sum((y_clean_all - y_clean_all.mean()) ** 2)
-    rmse_all = np.sqrt(np.mean((y_clean_all - y_pred_all) ** 2))
-    mean_obs_all = np.mean(y_clean_all)
-    prmse_all = (rmse_all / mean_obs_all) * 100 if mean_obs_all != 0 else np.nan
-    total_obs_all = len(x_clean_all)
-
-    source_color_map = {
-        'PeMS': '#08306b',       # Moonshine
-        'San Diego': '#F6C800',  # Sunshine
-        'Chula Vista': '#F65166',# Confetti
-        'Carlsbad': '#49C2D6',   # Splash
-        'El Cajon': '#F2762E',   # Squash
-        'Oceanside': '#2E87C8',    # Sky
-        'Del Mar': '#A3E7D8',     # Mint
-        'Coronado': '#C3B1E1'      # Lavender
-    }
-
-    # === Scatter plot ===
-    # Fix scatter filtering
-    if selected_group:
-        scatter_df = df_filtered2[df_filtered2[groupby_col] == selected_group][['count_day', 'day_flow', 'hwycovid']].dropna()
-    else:
-        scatter_df = df_filtered2[['count_day', 'day_flow', 'hwycovid']].dropna()
-
-     # Regression line
-    x = scatter_df['count_day']
-    y = scatter_df['day_flow']
+    scatter_df = sub_df[[obs_col, model_col, 'hwycovid']].dropna()
+    x, y = scatter_df[obs_col], scatter_df[model_col]
     slope, intercept = np.polyfit(x, y, 1)
     line_x = np.linspace(x.min(), x.max(), 100)
     line_y = slope * line_x + intercept
-    r_squared = 1 - np.sum((y - (slope * x + intercept)) ** 2) / np.sum((y - y.mean()) ** 2)
 
     scatter_fig = go.Figure()
-
-    # Add points first
     scatter_fig.add_trace(go.Scatter(
-        x=scatter_df['count_day'],
-        y=scatter_df['day_flow'],
-        mode='markers',
-        name='Paired Data Point',
+        x=x, y=y, mode='markers', name='Points',
         marker=dict(size=7, color='#08306b', opacity=0.5),
         customdata=scatter_df[['hwycovid']]
     ))
-
-    # Add regression line second
     scatter_fig.add_trace(go.Scatter(
-        x=line_x,
-        y=line_y,
-        mode='lines',
-        name='Best Fit Line',
+        x=line_x, y=line_y, mode='lines', name='Fit',
         line=dict(color='#F65166', dash='dash', width=3)
     ))
-
     scatter_fig.update_layout(
-    xaxis_title='Observed Count',
-    yaxis_title='Model Flow',
-    xaxis=dict(range=[-5000, 150000]), 
-    yaxis=dict(range=[-5000, 150000]), 
-    legend=dict(
-        orientation='h',
-        yanchor='bottom',
-        y=1.02,
-        xanchor='left',
-        x=0
-    ),
-    margin=dict(t=20, b=0, l=40, r=20)
-)
-    
-    # Build initial donut chart with fixed color mapping
-    source_dist  = sub_df['source'].value_counts().reset_index()
-    source_dist .columns = ['Source', 'Count']
-    source_dist ['Percent'] = round(100 * source_dist ['Count'] / source_dist ['Count'].sum())
+        xaxis_title='Observed Volume', yaxis_title='Model Volume',
+        margin=dict(t=20, b=0, l=40, r=20)
+    )
 
-    # Apply color mapping
-    colors = [source_color_map.get(src, '#CCCCCC') for src in source_dist ['Source']]
-
-    source_fig = go.Figure(go.Pie(
-        labels=source_dist['Source'],
-        values=source_dist['Percent'],
-        hole=0.6,
-        textinfo='label+percent',
-        marker=dict(colors=colors)
+    # === Source Ring Chart ===
+    source_dist = sub_df['source'].value_counts().reset_index()
+    source_dist.columns = ['Source', 'Count']
+    source_dist['Percent'] = round(100 * source_dist['Count'] / source_dist['Count'].sum())
+    colors = ['#08306b', '#F6C800', '#F65166', '#49C2D6', '#F2762E', '#2E87C8']
+    ring_fig = go.Figure(go.Pie(
+        labels=source_dist['Source'], values=source_dist['Percent'],
+        hole=0.6, textinfo='label+percent', marker=dict(colors=colors)
     ))
-    source_fig.update_layout(margin=dict(t=0, b=20, l=20, r=0),showlegend=False)
+
+    # === Statistics Box ===
+    r_squared = 1 - np.sum((y - (slope * x + intercept))**2) / np.sum((y - y.mean())**2)
+    rmse = np.sqrt(np.mean((y - (slope * x + intercept))**2))
+    prmse = (rmse / y.mean()) * 100 if y.mean() != 0 else np.nan
 
     stat_box = html.Div([
-    html.Div([
-        html.H3(f"{slope_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
-        html.Small("Slope")
-    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+        html.Div([html.H3(f"{slope:.2f}"), html.Small("Slope")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{r_squared:.2f}"), html.Small("R²")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{prmse:.2f}%"), html.Small("PRMSE")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{len(scatter_df)}"), html.Small("Count")], style={'textAlign': 'center'})
+    ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'})
 
-    html.Div([
-        html.H3(f"{r_squared_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
-        html.Small("R-Squared")
-    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+    return bar_fig, bar_fig2, count_fig, scatter_fig, ring_fig, stat_box
 
-    html.Div([
-        html.H3(f"{prmse_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
-        html.Small("PRMSE")
-    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
-
-    html.Div([
-        html.H3(f"{total_obs_all}", style={'margin': '0', 'fontSize': '20px'}),
-        html.Small("Total Observed Counts")
-    ], style={'textAlign': 'center', 'marginBottom': '20px'})
-], style={'flex': '1', 'padding': '0px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'})
-
-
-    return fig1, fig2, fig3, scatter_fig, source_fig, stat_box
 
 @app.callback(
     Output('line_plot', 'figure'),
