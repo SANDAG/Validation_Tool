@@ -1044,7 +1044,11 @@ def update_line_chart(selected_corridors, scenario_id, selected_period, selected
     Input('matrix_selector', 'value')
 )
 def update_table_and_ring(corridors, metric):
-    df_base = df_filtered1.copy()
+    if ENV == "local":
+        df_base = df1_all
+    else:
+        df_base = df1_all[df1_all['scenario_id'] == scenario_id]
+
     columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'day_flow', 'day_vmt', 'vmt_day']
 
     if not corridors or 'ALL' in corridors:
