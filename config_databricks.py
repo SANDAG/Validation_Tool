@@ -32,9 +32,9 @@ def read_geotable(table_name, conn):
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
-def read_table(table_name, conn, scenario_id):
+def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name} WHERE scenario_id = {scenario_id}"
+        query = f"SELECT * FROM {table_name}"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -48,17 +48,21 @@ def clean_and_convert_columns(df, columns):
 
 # === Main function ===
 def load_data():
-    SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
-    print(f"🔍 Using SCENARIO_ID: {SCENARIO_ID}") 
+    # SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
+    # print(f"🔍 Using SCENARIO_ID: {SCENARIO_ID}") 
     http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
     conn = get_connection(http_path_input)
 
-    df1 = read_table('tam_dev.validation.fwy', conn,SCENARIO_ID)
-    df2 = read_table('tam_dev.validation.all_class', conn,SCENARIO_ID)
+    df1 = read_table('tam_dev.validation.fwy', conn)
+    df2 = read_table('tam_dev.validation.all_class', conn)
+    df3 = read_table('tam_dev.validation.truck', conn)
+    df4 = read_table('tam_dev.validation.board', conn)
 
-    df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'])
+    df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
-    df_filtered2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'])
+    df_filtered2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
+    df_filtered3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
+    df_filtered4 = df4.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
 
     columns_to_clean = [
         'count_day', 'count_ea', 'count_am', 'count_md', 'count_pm', 'count_ev',
@@ -66,6 +70,7 @@ def load_data():
         'md_flow', 'md_speed', 'md_vmt', 'pm_flow', 'pm_speed', 'pm_vmt',
         'ev_flow', 'ev_speed', 'ev_vmt', 'day_flow', 'day_speed', 'day_vmt',
         'truckflow', 'lhdtruckflow', 'mhdtruckflow', 'hhdtruckflow',
+        'truckaadt','lhdtruckaadt','mhdtruckaadt','hhdtruckaadt',
         'vis_order', 'vmt_day', 'gap_day', 'vmt_gap_day',
         'vmt_ea', 'gap_ea', 'vmt_gap_ea', 'vmt_am', 'gap_am', 'vmt_gap_am',
         'vmt_md', 'gap_md', 'vmt_gap_md', 'vmt_pm', 'gap_pm', 'vmt_gap_pm',
@@ -75,6 +80,8 @@ def load_data():
 
     df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
     df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
+    df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
+    df_filtered4 = clean_and_convert_columns(df_filtered4, columns_to_clean)
 
     df_link = read_geotable('tam_dev.abm3.network__emme_hwy_tcad ', conn)
     df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
@@ -91,5 +98,7 @@ def load_data():
     return {
         "df1": df_filtered1,
         "df2": df_filtered2,
+        "df3": df_filtered3,
+        "df4": df_filtered4,
         "geojson_data": geojson_data
     }

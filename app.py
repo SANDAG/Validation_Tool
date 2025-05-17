@@ -29,13 +29,25 @@ else:
     scenario_id = int(os.getenv("SCENARIO_ID", "1150"))
 
 data = load_data()
-df_filtered1 = data["df1"]
-df_filtered2 = data["df2"]
-df3 =  data["df3"]
-df4 =  data["df4"]
+df1_all = data["df1"]
+df2_all = data["df2"]
+df3_all =  data["df3"]
+df4_all =  data["df4"]
 geojson_data = data["geojson_data"]
 
+scenario_id_default = 1150
+if ENV == "local":
+    df_filtered1 = df1_all
+    df_filtered2 = df2_all
+    df3 = df3_all
+    df4 = df4_all
+else:
+    df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
+    df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
+    df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
+    df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
 
+    
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
 line_df['Label'] = line_df['fxnm'].fillna('Unknown') + ' to ' + line_df['txnm'].fillna('Unknown')
@@ -295,9 +307,9 @@ source_fig = go.Figure(go.Pie(
     values=source_dist['Percent'],
     hole=0.6,
     textinfo='label+percent',
-    marker=dict(colors=colors)
+    marker=dict(colors=colors),
 ))
-
+source_fig.update_layout(showlegend=False,legend=dict(orientation="v", x=1.2, y=0.5))
 
 # === App Layout ===
 # === Define Page 1 Layout: Volume Validation ===
@@ -352,16 +364,18 @@ def page_volume_validation():
                 style={'flex': '7', 'width': '100%', 'padding': '0', 'margin': '0'}
             ),
             # Lower container (ring + stats) takes ~30% of available height.
+            # Apply layout updates to the figure *before* passing into dcc.Graph
+
             html.Div([
                 # Left: Ring Chart
                 html.Div([
                     dcc.Graph(
                         id='source-ring',
-                        figure=source_fig.update_layout(showlegend=False),
+                        figure=source_fig,
                         config={'displayModeBar': False},
-                        style={'height': '100%', 'width': '100%', 'padding': '0', 'margin': '0'}
+                        style={'height': '300px', 'width': '300px'}
                     )
-                ], style={'flex': '1', 'padding': '0', 'margin': '0'}),
+                ], style={'flex': '1', 'display': 'flex','padding': '0', 'margin': '0','justifyContent': 'center','alignItems': 'center' }),
                 # Right: Stats
                 html.Div(
                     id='stat-box',
@@ -386,6 +400,7 @@ def page_volume_validation():
                     style={
                         'flex': '1',
                         'padding': '0',
+                        'display': 'flex',
                         'margin': '0',
                         'display': 'flex',
                         'flexDirection': 'column',
@@ -559,14 +574,38 @@ def page_vmt_comparison():
 # === Full App Layout with Collapsible Sidebar ===
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-html.Div([
-    html.Div(html.H3(f'Scenario ID = {scenario_id}'), style={'marginLeft': '100px'}),
-    html.Button("☰ Menu", id="menu-button", n_clicks=0, style={
+
+    # === Fixed Top Bar ===
+    html.Div([
+        html.Button("☰ Menu", id="menu-button", n_clicks=0, style={'marginRight': '10px'}),
+        html.Div("Scenario:", style={'marginRight': '5px', 'fontWeight': 'bold'}),
+        dcc.Dropdown(
+            id='scenario_selector',
+            options=[
+                {'label': '1150', 'value': 1150},
+                {'label': '254', 'value': 254},
+                {'label': '272', 'value': 272},
+            ],
+            value=1150,
+            clearable=False,
+            style={'width': '120px'}
+        )
+    ], style={
         'position': 'fixed',
-        'top': '10px',
-        'left': '10px',
-        'zIndex': '1001'
+        'top': '0',
+        'left': '0',
+        'width': '100%',
+        'backgroundColor': 'white',
+        'padding': '10px 20px',
+        'zIndex': '1001',
+        'display': 'flex',
+        'alignItems': 'center',
+        'gap': '10px',
+        'fontFamily': 'Open Sans, verdana, arial, sans-serif',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
     }),
+
+    # === Sidebar (starts after top bar) ===
     html.Div(id='sidebar-content', children=[
         html.H2(" "),
         html.Hr(),
@@ -575,35 +614,47 @@ html.Div([
         dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'})
     ], style={
         'position': 'fixed',
-        'top': '0',
-        'left': '-200px',  # off-screen initially
+        'top': '60px', 
+        'left': '-200px',
         'width': '200px',
-        'height': '100vh',
+        'height': 'calc(100vh - 60px)',
         'backgroundColor': '#f8f9fa',
         'padding': '20px',
         'boxSizing': 'border-box',
         'zIndex': '1000',
         'transition': 'left 0.3s'
-    })
-], id='sidebar-wrapper', style={'fontsize':'20px', 'fontFamily': 'Open Sans, verdana, arial, sans-serif'}),
+    }),
 
-    html.Div(id='page-content', style={'marginLeft': '0px','transition': 'margin-left 0.3s', 'padding': '20px','fontFamily': 'Open Sans, verdana, arial, sans-serif'})
+    # === Page Content (also pushed down) ===
+    html.Div(id='page-content', style={
+        'marginLeft': '0px',
+        'transition': 'margin-left 0.3s',
+        'padding': '60px 20px 20px 20px', 
+        'fontFamily': 'Open Sans, verdana, arial, sans-serif'
+    })
 ])
 
 
-
-
-# === Page Router Callback ===
 @app.callback(
     Output('page-content', 'children'),
-    Input('url', 'pathname')
+    Input('url', 'pathname'),
+    Input('scenario_selector', 'value')
 )
-def render_page(pathname):
+def update_page(pathname, scenario_id):
+    global df_filtered1, df_filtered2, df3, df4
+
+    if ENV == 'databricks':
+        df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id]
+        df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
+        df3 = df3_all[df3_all['scenario_id'] == scenario_id]
+        df4 = df4_all[df4_all['scenario_id'] == scenario_id]
+
     if pathname == '/volume_by_hwy':
         return page_volume_by_hwy()
     elif pathname == '/vmt_comparison':
         return page_vmt_comparison()
     return page_volume_validation()
+
 
 
 # === Collapsible Sidebar Toggle ===
@@ -701,13 +752,20 @@ from plotly import graph_objects as go
     Input('bar_fig2', 'clickData'),
     Input('count_fig', 'clickData'),
     Input('groupby_selector', 'value'),
-    Input('vehicle_class_selector', 'value'),  # new
+    Input('scenario_selector', 'value'),
+    Input('vehicle_class_selector', 'value'),
     State('bar_fig', 'figure'),
     prevent_initial_call=False
 )
-def update_all(click1, click2, click3, groupby_col, vehicle_class, current_fig1):
+def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, current_fig1):
     ctx = callback_context
     trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+    if ENV == 'databricks':
+        df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
+        df3 = df3_all[df3_all['scenario_id'] == scenario_id]
+    else:
+        df_filtered2 = df2_all.copy()
+        df3 = df3_all.copy()
 
     # Select correct data and columns
     if vehicle_class == 'all':
@@ -843,7 +901,8 @@ def update_all(click1, click2, click3, groupby_col, vehicle_class, current_fig1)
     ))
     scatter_fig.update_layout(
         xaxis_title='Observed Volume', yaxis_title='Model Volume',
-        margin=dict(t=20, b=0, l=40, r=20)
+        margin=dict(t=20, b=0, l=40, r=20),
+        showlegend=False
     )
 
     # === Source Ring Chart ===
@@ -855,6 +914,12 @@ def update_all(click1, click2, click3, groupby_col, vehicle_class, current_fig1)
         labels=source_dist['Source'], values=source_dist['Percent'],
         hole=0.6, textinfo='label+percent', marker=dict(colors=colors)
     ))
+    ring_fig.update_layout(
+        showlegend=False,
+        legend=dict(orientation="v", x=1.2, y=0.5),
+        margin=dict(t=10, b=10, l=10, r=10),
+        height=200
+    ),
 
     # === Statistics Box ===
     r_squared = 1 - np.sum((y - (slope * x + intercept))**2) / np.sum((y - y.mean())**2)
@@ -874,12 +939,16 @@ def update_all(click1, click2, click3, groupby_col, vehicle_class, current_fig1)
 @app.callback(
     Output('line_plot', 'figure'),
     Input('corridor_filter', 'value'),
+    Input('scenario_selector', 'value'),
     Input('time_period_selector', 'value'),
     Input('matrix_selector', 'value')
 )
-def update_line_chart(selected_corridors, selected_period, selected_metric):
+def update_line_chart(selected_corridors, scenario_id, selected_period, selected_metric):
     # Choose correct DataFrame
-    base_df = line_df.copy()
+    if ENV == "local":
+        base_df = df1_all
+    else:
+        base_df = df1_all[df1_all['scenario_id'] == scenario_id]
 
     # Filter corridor
     if not selected_corridors:
@@ -931,7 +1000,8 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
         customdata=filtered_df[['hwycovid']],
         mode='lines+markers',
         name=f'Model {model_col}',
-        line=dict(color='#08306b')
+        line=dict(color='#08306b'),
+        connectgaps=False
     ))
 
     fig.add_trace(go.Scatter(
@@ -940,7 +1010,8 @@ def update_line_chart(selected_corridors, selected_period, selected_metric):
         customdata=filtered_df[['hwycovid']],
         mode='lines+markers',
         name=f'Observed {obs_col}',
-        line=dict(color='#F65166')
+        line=dict(color='#F65166'),
+        connectgaps=False
     ))
 
     fig.update_layout(
