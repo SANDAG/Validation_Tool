@@ -6,11 +6,12 @@ from dash import Input, Output, State
 import plotly.express as px
 import json
 import dash_leaflet as dl
-from dash_extensions.javascript import assign
 import numpy as np
 import plotly.graph_objects as go
 from dash import callback_context
 import dash_bootstrap_components as dbc
+from plotly.subplots import make_subplots
+from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig
 
 # === Load data from conig_local ===
 if "DATABRICKS_HOST" in os.environ:
@@ -25,6 +26,7 @@ if ENV == "local":
     from config_local import load_data
     scenario_id = 1150
     scenario_id_list= [1150]
+    scenario_id_default = 1150
 else:
     from config_databricks import load_data
     scenario_id = int(os.getenv("SCENARIO_ID", "1150"))
@@ -40,16 +42,11 @@ df3_all =  data["df3"]
 df4_all =  data["df4"]
 geojson_data = data["geojson_data"]
 
-if ENV == "local":
-    df_filtered1 = df1_all
-    df_filtered2 = df2_all
-    df3 = df3_all
-    df4 = df4_all
-else:
-    df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
-    df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
-    df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
-    df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
+
+df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
+df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
+df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
+df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
 
     
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
@@ -103,237 +100,32 @@ line_fig.update_layout(
 )
 
 # === Scatter Plot: count_day vs DAY_Flow ===
-scatter_df = df_filtered2[['count_day', 'day_flow','hwycovid']].dropna()
-x = scatter_df['count_day']
-y = scatter_df['day_flow']
-slope, intercept = np.polyfit(x, y, 1)
-line_x = np.linspace(x.min(), x.max(), 100)
-line_y = slope * line_x + intercept
-r_squared = 1 - np.sum((y - (slope * x + intercept)) ** 2) / np.sum((y - y.mean()) ** 2)
+scatter_fig, r2, slope, prmse = build_scatter_plot(df_filtered2, 'count_day', 'day_flow')
+# for truck:
+scatter_fig_t, r2_t, slope_t, prms_te = build_scatter_plot(df3, 'truckaadt', 'truckflow')
 
-scatter_fig = px.scatter(
-    scatter_df,
-    x='count_day',
-    y='day_flow',
-    custom_data=['hwycovid'],
-    labels={'count_day': 'Observed Count', 'day_flow': 'Model Flow'},
-    color_discrete_sequence=["#08306b"],
-    opacity=0.6
-)
+# === Compute Overall Stats for Display ===
+slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_filtered2, 'count_day', 'day_flow')
+# for truck
+slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
 
-# Modify marker size for all points
-scatter_fig.update_traces(marker=dict(size=9)) 
+# === Call Function to create map ===
+leaflet_map = create_map(geojson_data)
 
-# Add regression line
-scatter_fig.add_trace(go.Scatter(
-    x=line_x,
-    y=line_y,
-    mode='lines',
-    name='Best Fit Line',
-    line=dict(color='#F65166', dash='dash',width=3)
-))
-
-# === Calculate R² slope and PRMSE per PMSA ===
-results = []
-
-for pmsa, group in df_filtered2.groupby('pmsa_nm'):
-    x = pd.to_numeric(group['count_day'], errors='coerce')
-    y = pd.to_numeric(group['day_flow'], errors='coerce')
-    
-    mask = ~np.isnan(x) & ~np.isnan(y)
-    x_clean = x[mask]
-    y_clean = y[mask]
-
-    if len(x_clean) > 1:
-        slope, intercept = np.polyfit(x_clean, y_clean, 1)
-        y_pred = slope * x_clean + intercept
-        r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
-        
-        rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
-        mean_obs = np.mean(y_clean)
-        prmse = (rmse / mean_obs) * 100 if mean_obs != 0 else np.nan
-
-        results.append({
-            'PMSA': pmsa,
-            'R_squared': round(r_squared, 2),
-            'Slope': round(slope, 2),
-            'PRMSE': round(prmse, 2)
-        })
-
-r2slope_df = pd.DataFrame(results)
-
-
-# === Define style function directly in JavaScript ===
-# This approach avoids issues with the arrow_function
-style_function = assign("""function(feature, context) {
-    const props = context && context.props ? context.props : {};
-    const hideout = context.hideout || {};
-    const highlight_id = hideout.highlight_id;
-    const isHighlighted = feature.properties.hwycovid == highlight_id;
-
-    if (isHighlighted) {
-        return { color: "yellow", weight: 6, opacity: 1.0 };
-    }
-
-    const gap = feature.properties.gap_day;
-    let color = 'gray';
-
-    if (gap !== null && gap !== undefined) {
-        if (gap < -10) {
-            color = '#08306b';
-        } else if (gap < -5) {
-            color = '#485187';
-        } else if (gap < 0) {
-            color = '#6C649F';
-        } else if (gap < 5) {
-            color = '#9057A3';
-        } else if (gap < 10) {
-            color = '#B44691';
-        } else {
-            color = '#F65166';
-        }
-    }
-
-    if (isHighlighted) {
-        return {
-            color: 'yellow',
-            weight: 7,
-            opacity: 1.0
-        };
-    }
-
-    return {
-        color: color,
-        weight: 2,
-        opacity: 0.8
-    };
-}""")
-
-
-
-
-# Define a simple hover style
-hover_style = dict(weight=5, color='#666', dashArray='', fillOpacity=0.7)
+# === Create Ring Chart for 'source' Distribution ===
+source_fig = build_source_ring_chart(df_filtered2)
+# or for truck
+source_fig_t = build_source_ring_chart(df3)
 
 # === Initialize Dash App ===
 app = Dash(__name__, suppress_callback_exceptions=True)
 app.title = "SANDAG Volume Validation Dashboard"
-
-
-# === Create Leaflet Map ===
-leaflet_map = dl.Map(
-    id='map',
-    center=[32.9, -117],
-    zoom=10,  # zoom will now work since we removed zoomToBounds
-    children=[
-        dl.TileLayer(
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-            attribution='© OpenStreetMap contributors, © CartoDB'
-        ),
-        dl.GeoJSON(
-            data=geojson_data,
-            id="geojson",
-            hoverStyle=hover_style,
-            hideout={"highlight_id": None, "selected": []},
-            style=style_function,
-            children=[
-                dl.Popup(id="popup")
-            ]
-        ),
-
-        # Custom HTML legend here:
-        html.Div([
-            html.Div([
-                html.B("Gap Day Legend"),
-                html.Div("Gap < -10", style={'color': '#08306b'}),
-                html.Div("-10 ≤ Gap < -5", style={'color': '#485187'}),
-                html.Div("-5 ≤ Gap < 0", style={'color': '#6C649F'}),
-                html.Div("0 ≤ Gap < 5", style={'color': '#9057A3'}),
-                html.Div("5 ≤ Gap < 10", style={'color': '#B44691'}),
-                html.Div("Gap ≥ 10", style={'color': '#F65166'})
-            ], style={
-                'position': 'absolute',
-                'bottom': '20px',
-                'right': '20px',
-                'zIndex': '1000',
-                'background': 'white',
-                'padding': '10px',
-                'border': '1px solid #ccc',
-                'borderRadius': '5px',
-                'fontSize': '12px',
-                'lineHeight': '1.2em',
-                'boxShadow': '0px 0px 5px rgba(0,0,0,0.3)'
-            })
-        ])
-    ],
-    style={'width': '100%', 'height': '100%'}
-)
-
-# === Compute Overall Stats for Display ===
-x_all = pd.to_numeric(df_filtered2['count_day'], errors='coerce')
-y_all = pd.to_numeric(df_filtered2['day_flow'], errors='coerce')
-mask_all = ~np.isnan(x_all) & ~np.isnan(y_all)
-x_clean_all = x_all[mask_all]
-y_clean_all = y_all[mask_all]
-
-slope_all, intercept_all = np.polyfit(x_clean_all, y_clean_all, 1)
-y_pred_all = slope_all * x_clean_all + intercept_all
-r_squared_all = 1 - np.sum((y_clean_all - y_pred_all) ** 2) / np.sum((y_clean_all - y_clean_all.mean()) ** 2)
-rmse_all = np.sqrt(np.mean((y_clean_all - y_pred_all) ** 2))
-mean_obs_all = np.mean(y_clean_all)
-prmse_all = (rmse_all / mean_obs_all) * 100 if mean_obs_all != 0 else np.nan
-total_obs_all = len(x_clean_all)
-
-
-# === Create Ring Chart for 'source' Distribution ===
-source_color_map = {
-    'PeMS': '#08306b',       # Moonshine
-    'San Diego': '#F6C800',  # Sunshine
-    'Chula Vista': '#F65166',# Confetti
-    'Carlsbad': '#49C2D6',   # Splash
-    'El Cajon': '#F2762E',   # Squash
-    'Oceanside': '#2E87C8',    # Sky
-    'Del Mar': '#A3E7D8',     # Mint
-    'Coronado': '#C3B1E1'      # Lavender
-}
-
-# Build initial donut chart with fixed color mapping
-source_dist = df_filtered2['source'].value_counts().reset_index()
-source_dist.columns = ['Source', 'Count']
-source_dist['Percent'] = round(100 * source_dist['Count'] / source_dist['Count'].sum())
-
-# Apply color mapping
-colors = [source_color_map.get(src, '#CCCCCC') for src in source_dist['Source']]
-
-source_fig = go.Figure(go.Pie(
-    labels=source_dist['Source'],
-    values=source_dist['Percent'],
-    hole=0.6,
-    textinfo='label+percent',
-    marker=dict(colors=colors),
-))
-source_fig.update_layout(showlegend=False,legend=dict(orientation="v", x=1.2, y=0.5))
 
 # === App Layout ===
 # === Define Page 1 Layout: Volume Validation ===
 def page_volume_validation():
     return html.Div([
         html.Div([
-            html.Div([
-                html.Div("Select Vehicle Type:", style={'marginRight': '10px', 'fontWeight': 'bold'}),
-                dcc.Dropdown(
-                id='vehicle_class_selector',
-                options=[
-                    {'label': 'All Class', 'value': 'all'},
-                    {'label': 'Truck', 'value': 'truck'},
-                    {'label': 'LHD Truck', 'value': 'lhd'},
-                    {'label': 'MHD Truck', 'value': 'mhd'},
-                    {'label': 'HHD Truck', 'value': 'hhd'}
-                ],
-                value='all',
-                clearable=False,
-                style={'width': '200px', 'marginRight': '10px'}
-            )],style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'}),
             html.Div([
                 html.H3("R² and Slope", style={'marginRight': '20px'}),
                 dcc.Dropdown(
@@ -363,7 +155,6 @@ def page_volume_validation():
             # Scatter plot container (takes ~70% of available height)
             dcc.Graph(
                 id='scatter',
-                figure=scatter_fig,
                 style={'flex': '7', 'width': '100%', 'padding': '0', 'margin': '0'}
             ),
             # Lower container (ring + stats) takes ~30% of available height.
@@ -374,7 +165,6 @@ def page_volume_validation():
                 html.Div([
                     dcc.Graph(
                         id='source-ring',
-                        figure=source_fig,
                         config={'displayModeBar': False},
                         style={'height': '300px', 'width': '300px'}
                     )
@@ -434,6 +224,121 @@ def page_volume_validation():
         ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box','height': '100%','width':'33.3%'})
     ], style={'display': 'flex', 'width': '100%', 'height': '700px'})
 
+def page_truck_validation():
+    return html.Div([
+        html.Div([
+            html.Div([
+                html.Div("Select Vehicle Type:", style={'marginRight': '10px', 'fontWeight': 'bold'}),
+                dcc.Dropdown(
+                id='vehicle_class_selector',
+                options=[
+                    {'label': 'All Class', 'value': 'all'},
+                    {'label': 'Truck', 'value': 'truck'},
+                    {'label': 'LHD Truck', 'value': 'lhd'},
+                    {'label': 'MHD Truck', 'value': 'mhd'},
+                    {'label': 'HHD Truck', 'value': 'hhd'}
+                ],
+                value='all',
+                clearable=False,
+                style={'width': '200px', 'marginRight': '10px'}
+            )],style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'}),
+            html.Div([
+                html.H3("R² and Slope", style={'marginRight': '20px'}),
+                dcc.Dropdown(
+                    id='groupby_selector',
+                    options=[
+                        {'label': 'By PMSA', 'value': 'pmsa_nm'},
+                        {'label': 'By City', 'value': 'city_nm'},
+                        {'label': 'By Volume Category', 'value': 'vcategory'},
+                        {'label': 'By Road Class', 'value': 'rdclass'}
+                    ],
+                    value='rdclass',
+                    clearable=False,
+                    style={'width': '200px'}
+                )
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'}),
+
+            dcc.Graph(id='truck_bar_fig', style={'height': '36%', 'marginBottom': '0px'}),
+            html.H3("PRMSE", style={'marginTop': '5px'}),
+            dcc.Graph(id='truck_bar_fig2', style={'height': '30%', 'marginBottom': '0px'}),
+            html.H3("Number of Observed Counts", style={'marginTop': '5px'}),
+            dcc.Graph(id='truck_count_fig', style={'height': '30%'})
+        ], style={'flex': '1', 'padding': '5px', 'boxSizing': 'border-box','width':'33.3%','height': '100%'}),
+
+       html.Div([
+           html.H3("Model Day Flow VS Observed Daily Count"),
+        html.Div([
+            # Scatter plot container (takes ~70% of available height)
+            dcc.Graph(
+                id='truck_scatter',
+                style={'flex': '7', 'width': '100%', 'padding': '0', 'margin': '0'}
+            ),
+            # Lower container (ring + stats) takes ~30% of available height.
+            # Apply layout updates to the figure *before* passing into dcc.Graph
+
+            html.Div([
+                # Left: Ring Chart
+                html.Div([
+                    dcc.Graph(
+                        id='truck_source_ring',
+                        config={'displayModeBar': False},
+                        style={'height': '300px', 'width': '300px'}
+                    )
+                ], style={'flex': '1', 'display': 'flex','padding': '0', 'margin': '0','justifyContent': 'center','alignItems': 'center' }),
+                # Right: Stats
+                html.Div(
+                    id='truck_stat_box',
+                    children=[
+                        html.Div([
+                            html.H3(f"{slope_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
+                            html.Small("Slope")
+                        ], style={'textAlign': 'center', 'marginBottom': '10px'}),
+                        html.Div([
+                            html.H3(f"{r_squared_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
+                            html.Small("R-Squared")
+                        ], style={'textAlign': 'center', 'marginBottom': '10px'}),
+                        html.Div([
+                            html.H3(f"{prmse_all:.2f}", style={'margin': '0', 'fontSize': '20px'}),
+                            html.Small("PRMSE")
+                        ], style={'textAlign': 'center', 'marginBottom': '10px'}),
+                        html.Div([
+                            html.H3(f"{total_obs_all}", style={'margin': '0', 'fontSize': '20px'}),
+                            html.Small("Total Observed Counts")
+                        ], style={'textAlign': 'center'})
+                    ],
+                    style={
+                        'flex': '1',
+                        'padding': '0',
+                        'display': 'flex',
+                        'margin': '0',
+                        'display': 'flex',
+                        'flexDirection': 'column',
+                        'justifyContent': 'center'
+                    }
+                )
+            ], style={
+                'display': 'flex',
+                'flexDirection': 'row',
+                'flex': '3',
+                'width': '100%',
+                'padding': '0',
+                'margin': '0'
+            })
+        ], style={
+            'display': 'flex',
+            'flexDirection': 'column',
+            'height': '100%',
+            'width': '100%',
+            'padding': '0',
+            'margin': '0'
+        })
+    ], style={'flex': '1', 'padding': '0', 'boxSizing': 'border-box', 'width': '33.3%', 'height': '100%'}),
+
+        html.Div([
+            html.H3("Map: Gap Day by Hwy Coverage ID"),
+            leaflet_map
+        ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box','height': '100%','width':'33.3%'})
+    ], style={'display': 'flex', 'width': '100%', 'height': '700px'})
 
 # === Define Page 2 Layout: Volume Validation by Hwy ===
 def page_volume_by_hwy():
@@ -484,7 +389,7 @@ def page_volume_by_hwy():
             ], style={'display': 'flex'})
         ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '10px'}),
             html.Div([
-                dcc.Graph(id='line_plot', figure=line_fig, style={'height': '450px', 'minWidth': '1000px'})
+                dcc.Graph(id='line_plot', style={'height': '450px', 'minWidth': '1000px'})
             ], style={'overflowX': 'auto', 'width': '100%'}),
             html.Div([
                 html.Div([
@@ -514,45 +419,6 @@ def page_volume_by_hwy():
 
 # === Define Page 3 Layout: VMT===
 def page_vmt_comparison():
-    from plotly.subplots import make_subplots
-
-    def make_vmt_fig(group_col, title):
-        df_vmt = df_filtered2.copy()
-
-        # Group and rename
-        grouped = df_vmt.groupby(group_col)[['day_vmt', 'vmt_day']].sum().reset_index()
-        grouped = grouped.rename(columns={group_col: 'Group'})
-
-        # Melt in desired order: vmt_day (Observed) first
-        melted = grouped.melt(
-            id_vars='Group',
-            value_vars=['vmt_day', 'day_vmt'],
-            var_name='Source',
-            value_name='VMT'
-        )
-
-        # Map to display labels
-        label_map = {'vmt_day': 'Observed VMT', 'day_vmt': 'Model VMT'}
-        color_map = {'Observed VMT': '#F65166', 'Model VMT': '#08306b'}
-        melted['Source'] = melted['Source'].map(label_map)
-        fig = px.bar(
-            melted,
-            x='Group',
-            y='VMT',
-            color='Source',
-            barmode='group',
-            labels={'VMT': 'VMT', 'Group': group_col},
-            title=title,
-            color_discrete_map=color_map
-        )
-        fig.update_layout(
-            margin=dict(t=40, b=30, l=20, r=20),
-            xaxis_title=None,
-            yaxis_title=None,
-            height=None 
-        )
-        
-        return fig
 
     return html.Div([
         html.H2("VMT Comparison: Model vs Observed by Different Groups", style={'textAlign': 'center', 'marginBottom': '10px'}),
@@ -560,14 +426,14 @@ def page_vmt_comparison():
         html.Div([
             # Row 1
             html.Div([
-                dcc.Graph(figure=make_vmt_fig('pmsa_nm', 'By PMSA'), style={'width': '50%', 'height': '100%'}),
-                dcc.Graph(figure=make_vmt_fig('vcategory', 'By Category'), style={'width': '50%', 'height': '100%'})
+                dcc.Graph(figure=make_vmt_fig(df_filtered2,'pmsa_nm', 'By PMSA'), style={'width': '50%', 'height': '100%'}),
+                dcc.Graph(figure=make_vmt_fig(df_filtered2,'vcategory', 'By Category'), style={'width': '50%', 'height': '100%'})
             ], style={'display': 'flex', 'height': '50%'}),
 
             # Row 2
             html.Div([
-                dcc.Graph(figure=make_vmt_fig('city_nm', 'By City'), style={'width': '50%', 'height': '100%'}),
-                dcc.Graph(figure=make_vmt_fig('rdclass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
+                dcc.Graph(figure=make_vmt_fig(df_filtered2,'city_nm', 'By City'), style={'width': '50%', 'height': '100%'}),
+                dcc.Graph(figure=make_vmt_fig(df_filtered2,'rdclass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
             ], style={'display': 'flex', 'height': '50%'})
         ], style={'height': 'calc(100vh - 80px)'})  # Adjust to exclude H2 + padding
     ], style={'padding': '10px', 'height': '100vh', 'boxSizing': 'border-box',})
@@ -610,7 +476,8 @@ app.layout = html.Div([
         html.Hr(),
         dcc.Link("All Class Volume Validation", href="/", style={'display': 'block', 'margin': '10px'}),
         dcc.Link("Highway Volume Validation", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'})
+        dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'}),
+        dcc.Link("Truck Volume Validation", href="/truck_validation", style={'display': 'block', 'margin': '10px'})
     ], style={
         'position': 'fixed',
         'top': '60px', 
@@ -642,16 +509,17 @@ app.layout = html.Div([
 def update_page(pathname, scenario_id):
     global df_filtered1, df_filtered2, df3, df4
 
-    if ENV == 'databricks':
-        df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id]
-        df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
-        df3 = df3_all[df3_all['scenario_id'] == scenario_id]
-        df4 = df4_all[df4_all['scenario_id'] == scenario_id]
+    df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id]
+    df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
+    df3 = df3_all[df3_all['scenario_id'] == scenario_id]
+    df4 = df4_all[df4_all['scenario_id'] == scenario_id]
 
     if pathname == '/volume_by_hwy':
         return page_volume_by_hwy()
     elif pathname == '/vmt_comparison':
         return page_vmt_comparison()
+    elif pathname == '/truck_validation':
+        return page_truck_validation()
     return page_volume_validation()
 
 
@@ -692,9 +560,7 @@ def show_popup(clickData):
         html.Br(),
         f"Volume Gap Day: {props.get('gap_day', 'N/A')}%",
         html.Br(),
-        f"VMT Gap Day: {props.get('vmt_gap_day', 'N/A')}%",
-        html.Br(),
-        f"Speed Gap Day: {props.get('speed_gap_day', 'N/A')}%"
+        f"VMT Gap Day: {props.get('vmt_gap_day', 'N/A')}%"
     ])
 
 # === Map Highlight Callback ===
@@ -709,6 +575,20 @@ def zoom_from_scatter(clickData, hideout):
     if not clickData:
         return hideout, dash.no_update, dash.no_update
 
+    selected_id = clickData["points"][0]["customdata"][0]
+    return get_map_center(selected_id, hideout)
+
+@app.callback(
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("map", "center", allow_duplicate=True),
+    Output("map", "zoom", allow_duplicate=True),
+    Input("truck_scatter", "clickData"),
+    State("geojson", "hideout"),
+    prevent_initial_call=True
+)
+def zoom_from_truck_scatter(clickData, hideout):
+    if not clickData:
+        return hideout, dash.no_update, dash.no_update
     selected_id = clickData["points"][0]["customdata"][0]
     return get_map_center(selected_id, hideout)
 
@@ -752,19 +632,158 @@ from plotly import graph_objects as go
     Input('count_fig', 'clickData'),
     Input('groupby_selector', 'value'),
     Input('scenario_selector', 'value'),
-    Input('vehicle_class_selector', 'value'),
     State('bar_fig', 'figure'),
     prevent_initial_call=False
 )
-def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, current_fig1):
+def update_all(click1, click2, click3, groupby_col, scenario_id, current_fig1):
     ctx = callback_context
     trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-    if ENV == 'databricks':
-        df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
-        df3 = df3_all[df3_all['scenario_id'] == scenario_id]
+    df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
+    df3 = df3_all[df3_all['scenario_id'] == scenario_id]
+
+    # Select correct data and columns
+    df = df_filtered2.copy()
+    model_col, obs_col = 'day_flow', 'count_day'
+
+    # Get x-axis fixed order
+    if current_fig1 and 'data' in current_fig1 and len(current_fig1['data']) > 0:
+        x_axis_fixed = current_fig1['data'][0]['x']
     else:
-        df_filtered2 = df2_all.copy()
-        df3 = df3_all.copy()
+        x_axis_fixed = None
+
+    # Determine selected group
+    selected_group = None
+    clicked = ctx.triggered[0]['value']
+    if trigger in ['bar_fig', 'bar_fig2', 'count_fig'] and clicked and 'points' in clicked:
+        clicked_label = clicked['points'][0]['x']
+        if clicked_label == getattr(update_all, 'last_selected', None):
+            selected_group = None
+        else:
+            selected_group = clicked_label
+        update_all.last_selected = selected_group
+    else:
+        update_all.last_selected = None
+
+    # Bar chart stats (R², slope, PRMSE)
+    results, count_results = [], []
+    for group_val, group in df.groupby(groupby_col):
+        x = pd.to_numeric(group[obs_col], errors='coerce')
+        y = pd.to_numeric(group[model_col], errors='coerce')
+        mask = ~np.isnan(x) & ~np.isnan(y)
+        x_clean, y_clean = x[mask], y[mask]
+
+        if len(x_clean) > 1:
+            slope, intercept = np.polyfit(x_clean, y_clean, 1)
+            y_pred = slope * x_clean + intercept
+            r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
+            rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
+            prmse = (rmse / y_clean.mean()) * 100 if y_clean.mean() != 0 else np.nan
+            results.append({'Group': group_val, 'R_squared': round(r_squared, 2),
+                            'Slope': round(slope, 2), 'PRMSE': round(prmse, 2)})
+
+        count_results.append({'Group': group_val, 'Num_Observed': len(group)})
+
+    result_df = pd.DataFrame(results)
+    count_df = pd.DataFrame(count_results)
+
+    if x_axis_fixed is None:
+        x_axis_fixed = list(result_df['Group'])
+
+    # === Bar Charts ===
+    def build_bar_chart(metric, color):
+        return go.Figure([
+            go.Bar(
+                x=result_df['Group'],
+                y=result_df[metric],
+                marker_color=color,
+                marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']]),
+                name=metric
+            )
+        ]).update_layout(
+            barmode='group',
+            xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+            margin=dict(t=0, b=0, l=0, r=0),
+            yaxis_range=[0, 1.5 if metric == 'R_squared' else result_df[metric].max() * 1.2],
+            showlegend=False
+        )
+
+    bar_fig = go.Figure()
+    bar_fig.add_trace(go.Bar(
+        x=result_df['Group'], y=result_df['R_squared'], name='R²', marker_color='#08306b',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    bar_fig.add_trace(go.Bar(
+        x=result_df['Group'], y=result_df['Slope'], name='Slope', marker_color='#F65166',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    bar_fig.update_layout(barmode='group', margin=dict(t=0, b=0, l=0, r=0),
+                          xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed))
+
+    bar_fig2 = build_bar_chart('PRMSE', '#08306b')
+    count_fig = go.Figure()
+    for idx, row in count_df.iterrows():
+        op = 1 if row['Group'] == selected_group or selected_group is None else 0.3
+        count_fig.add_trace(go.Bar(
+            x=[row['Group']],
+            y=[row['Num_Observed']],
+            marker_color='#08306b',
+            opacity=op,
+            showlegend=False
+        ))
+    count_fig.update_layout(
+        margin=dict(t=0, b=0, l=0, r=0),
+        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+        showlegend=False
+    )
+
+    # === Scatter Plot ===
+    if selected_group:
+        sub_df = df[df[groupby_col] == selected_group]
+    else:
+        sub_df = df
+
+    scatter_df = sub_df[[obs_col, model_col, 'hwycovid']].dropna()
+    x, y = scatter_df[obs_col], scatter_df[model_col]
+    slope, intercept = np.polyfit(x, y, 1)
+    line_x = np.linspace(x.min(), x.max(), 100)
+    line_y = slope * line_x + intercept
+
+    scatter_fig, r_squared, slope, prmse = build_scatter_plot(sub_df, obs_col, model_col)
+
+    # === Source Ring Chart ===
+    ring_fig = build_source_ring_chart(sub_df)
+
+    # === Statistics Box ===
+    stat_box = html.Div([
+        html.Div([html.H3(f"{slope:.2f}"), html.Small("Slope")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{r_squared:.2f}"), html.Small("R²")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{prmse:.2f}%"), html.Small("PRMSE")], style={'textAlign': 'center'}),
+        html.Div([html.H3(f"{len(scatter_df)}"), html.Small("Count")], style={'textAlign': 'center'})
+    ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'})
+
+    return bar_fig, bar_fig2, count_fig, scatter_fig, ring_fig, stat_box
+
+@app.callback(
+    Output('truck_bar_fig', 'figure'),
+    Output('truck_bar_fig2', 'figure'),
+    Output('truck_count_fig', 'figure'),
+    Output('truck_scatter', 'figure'),
+    Output('truck_source_ring', 'figure'),
+    Output('truck_stat_box', 'children'),  
+    Input('truck_bar_fig', 'clickData'),
+    Input('truck_bar_fig2', 'clickData'),
+    Input('truck_count_fig', 'clickData'),
+    Input('groupby_selector', 'value'),
+    Input('scenario_selector', 'value'),
+    Input('vehicle_class_selector', 'value'),
+    State('truck_bar_fig', 'figure'),
+    prevent_initial_call=False
+)
+def update_truck(click1, click2, click3, groupby_col, scenario_id, vehicle_class, current_fig1):
+    ctx = callback_context
+    trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+    df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
+    df3 = df3_all[df3_all['scenario_id'] == scenario_id]
 
     # Select correct data and columns
     if vehicle_class == 'all':
@@ -888,42 +907,12 @@ def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, 
     line_x = np.linspace(x.min(), x.max(), 100)
     line_y = slope * line_x + intercept
 
-    scatter_fig = go.Figure()
-    scatter_fig.add_trace(go.Scatter(
-        x=x, y=y, mode='markers', name='Points',
-        marker=dict(size=7, color='#08306b', opacity=0.5),
-        customdata=scatter_df[['hwycovid']]
-    ))
-    scatter_fig.add_trace(go.Scatter(
-        x=line_x, y=line_y, mode='lines', name='Fit',
-        line=dict(color='#F65166', dash='dash', width=3)
-    ))
-    scatter_fig.update_layout(
-        xaxis_title='Observed Volume', yaxis_title='Model Volume',
-        margin=dict(t=20, b=0, l=40, r=20),
-        showlegend=False
-    )
+    scatter_fig, r_squared, slope, prmse = build_scatter_plot(sub_df, obs_col, model_col)
 
     # === Source Ring Chart ===
-    source_dist = sub_df['source'].value_counts().reset_index()
-    source_dist.columns = ['Source', 'Count']
-    source_dist['Percent'] = round(100 * source_dist['Count'] / source_dist['Count'].sum())
-    colors = ['#08306b', '#F6C800', '#F65166', '#49C2D6', '#F2762E', '#2E87C8']
-    ring_fig = go.Figure(go.Pie(
-        labels=source_dist['Source'], values=source_dist['Percent'],
-        hole=0.6, textinfo='label+percent', marker=dict(colors=colors)
-    ))
-    ring_fig.update_layout(
-        showlegend=False,
-        legend=dict(orientation="v", x=1.2, y=0.5),
-        margin=dict(t=5, b=5, l=5, r=5),
-    ),
+    ring_fig = build_source_ring_chart(sub_df)
 
     # === Statistics Box ===
-    r_squared = 1 - np.sum((y - (slope * x + intercept))**2) / np.sum((y - y.mean())**2)
-    rmse = np.sqrt(np.mean((y - (slope * x + intercept))**2))
-    prmse = (rmse / y.mean()) * 100 if y.mean() != 0 else np.nan
-
     stat_box = html.Div([
         html.Div([html.H3(f"{slope:.2f}"), html.Small("Slope")], style={'textAlign': 'center'}),
         html.Div([html.H3(f"{r_squared:.2f}"), html.Small("R²")], style={'textAlign': 'center'}),
@@ -932,7 +921,6 @@ def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, 
     ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'})
 
     return bar_fig, bar_fig2, count_fig, scatter_fig, ring_fig, stat_box
-
 
 @app.callback(
     Output('line_plot', 'figure'),
@@ -943,10 +931,7 @@ def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, 
 )
 def update_line_chart(selected_corridors, scenario_id, selected_period, selected_metric):
     # Choose correct DataFrame
-    if ENV == "local":
-        base_df = df1_all
-    else:
-        base_df = df1_all[df1_all['scenario_id'] == scenario_id]
+    base_df = df1_all[df1_all['scenario_id'] == scenario_id]
 
     # Filter corridor
     if not selected_corridors:
@@ -1042,10 +1027,8 @@ def update_line_chart(selected_corridors, scenario_id, selected_period, selected
     Input('matrix_selector', 'value')
 )
 def update_table_and_ring(corridors, metric):
-    if ENV == "local":
-        df_base = df1_all
-    else:
-        df_base = df1_all[df1_all['scenario_id'] == scenario_id]
+
+    df_base = df1_all[df1_all['scenario_id'] == scenario_id]
 
     columns_to_show = ['hwycovid', 'nm', 'fxnm', 'txnm','dir_nm', 'count_day', 'day_flow', 'day_vmt', 'vmt_day']
 

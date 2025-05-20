@@ -19,6 +19,11 @@ def load_data():
     df3.columns = df3.columns.str.lower()
     df4.columns = df4.columns.str.lower()
 
+    df1['scenario_id']=1150
+    df2['scenario_id']=1150
+    df3['scenario_id']=1150
+    df4['scenario_id']=1150
+
     return {
         "df1": df1,
         "df2": df2,
