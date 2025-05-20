@@ -23,10 +23,15 @@ print(f"✅ Running in environment: {ENV}")
 # Detect environment
 if ENV == "local":
     from config_local import load_data
-    scenario_id = 261
+    scenario_id = 1150
+    scenario_id_list= [1150]
 else:
     from config_databricks import load_data
     scenario_id = int(os.getenv("SCENARIO_ID", "1150"))
+    data = load_data()
+    df1_all = data["df1"]
+    scenario_id_list = df1_all['scenario_id'].unique()
+    scenario_id_default = scenario_id_list[0]
 
 data = load_data()
 df1_all = data["df1"]
@@ -35,7 +40,6 @@ df3_all =  data["df3"]
 df4_all =  data["df4"]
 geojson_data = data["geojson_data"]
 
-scenario_id_default = 1150
 if ENV == "local":
     df_filtered1 = df1_all
     df_filtered2 = df2_all
@@ -581,12 +585,8 @@ app.layout = html.Div([
         html.Div("Scenario:", style={'marginRight': '5px', 'fontWeight': 'bold'}),
         dcc.Dropdown(
             id='scenario_selector',
-            options=[
-                {'label': '1150', 'value': 1150},
-                {'label': '254', 'value': 254},
-                {'label': '272', 'value': 272},
-            ],
-            value=1150,
+            options=[{'label': str(sid), 'value': sid} for sid in sorted(set(scenario_id_list))],
+            value=scenario_id_list[0],  # Default to the first one
             clearable=False,
             style={'width': '120px'}
         )

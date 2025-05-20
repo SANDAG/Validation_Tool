@@ -9,6 +9,9 @@ from functools import lru_cache
 from databricks import sql
 from databricks.sdk.core import Config
 
+# === Define Scenario Ids Needed===
+scenario_id_list =[1150,272,254]
+
 # === Connection setup ===
 cfg = Config()
 
@@ -20,11 +23,11 @@ def get_connection(http_path):
         credentials_provider=lambda: cfg.authenticate,
     )
 
-def read_volumes(volume_name, conn):
-    with conn.cursor() as cursor:
-        query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
-        cursor.execute(query)
-        return cursor.fetchall_arrow().to_pandas()
+# def read_volumes(volume_name, conn):
+#     with conn.cursor() as cursor:
+#         query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
+#         cursor.execute(query)
+#         return cursor.fetchall_arrow().to_pandas()
 
 def read_geotable(table_name, conn):
     with conn.cursor() as cursor:
@@ -34,7 +37,8 @@ def read_geotable(table_name, conn):
 
 def read_table(table_name, conn):
     with conn.cursor() as cursor:
-        query = f"SELECT * FROM {table_name}"
+        placeholders = ','.join(str(id) for id in scenario_id_list)
+        query = f"SELECT * FROM {table_name} WHERE scenario_id IN ({placeholders})"
         cursor.execute(query)
         return cursor.fetchall_arrow().to_pandas()
 
@@ -48,8 +52,6 @@ def clean_and_convert_columns(df, columns):
 
 # === Main function ===
 def load_data():
-    # SCENARIO_ID = int(os.getenv("SCENARIO_ID", "1150"))
-    # print(f"🔍 Using SCENARIO_ID: {SCENARIO_ID}") 
     http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
     conn = get_connection(http_path_input)
 
