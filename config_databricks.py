@@ -61,7 +61,7 @@ def load_data():
     df4 = read_table('tam_dev.validation.board', conn)
 
     df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
-    df_filtered1['Label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
+    df_filtered1['label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
     df_filtered2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df_filtered3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df_filtered4 = df4.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
