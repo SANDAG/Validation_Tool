@@ -12,6 +12,8 @@ def load_data():
     with open(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\analysis\validation\Joined_hwy_all.geojson", "r") as f:
         geojson_data = json.load(f)
     
+    df1['label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
+    
     df1.columns = df1.columns.str.lower()
     df2.columns = df2.columns.str.lower()
     df3.columns = df3.columns.str.lower()

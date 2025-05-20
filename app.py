@@ -54,7 +54,6 @@ else:
     
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()
-line_df['Label'] = line_df['fxnm'].fillna('Unknown') + ' to ' + line_df['txnm'].fillna('Unknown')
 
 # Sort by hwycovid to ensure consistent ordering
 line_df = line_df.sort_values(by='hwycovid')
@@ -96,7 +95,7 @@ line_fig.update_layout(
         tickangle=45,
         tickmode='array',
         tickvals=line_df['hwycovid'],
-        ticktext=line_df['Label'],
+        ticktext=line_df['label'],
         tickfont=dict(size=8),
         showgrid=False,
         range=[-0.7, len(line_df) - 0.7]
@@ -917,8 +916,7 @@ def update_all(click1, click2, click3, groupby_col, scenario_id, vehicle_class, 
     ring_fig.update_layout(
         showlegend=False,
         legend=dict(orientation="v", x=1.2, y=0.5),
-        margin=dict(t=10, b=10, l=10, r=10),
-        height=200
+        margin=dict(t=5, b=5, l=5, r=5),
     ),
 
     # === Statistics Box ===
@@ -1026,7 +1024,7 @@ def update_line_chart(selected_corridors, scenario_id, selected_period, selected
             tickangle=45,
             tickmode='array',
             tickvals=filtered_df['hwycovid'],
-            ticktext=filtered_df['Label'],
+            ticktext=filtered_df['label'],
             tickfont=dict(size=10),
             showgrid=False,
             range=[-0.7, len(filtered_df) - 0.7]
