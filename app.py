@@ -11,29 +11,9 @@ import plotly.graph_objects as go
 from dash import callback_context
 import dash_bootstrap_components as dbc
 from plotly.subplots import make_subplots
+from load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig
 
-# === Load data from conig_local ===
-if "DATABRICKS_HOST" in os.environ:
-    ENV = "databricks"
-else:
-    ENV = "local"
-
-print(f"✅ Running in environment: {ENV}")
-
-# Detect environment
-if ENV == "local":
-    from config_local import load_data
-    scenario_id = 1150
-    scenario_id_list= [1150]
-    scenario_id_default = 1150
-else:
-    from config_databricks import load_data
-    scenario_id = int(os.getenv("SCENARIO_ID", "1150"))
-    data = load_data()
-    df1_all = data["df1"]
-    scenario_id_list = df1_all['scenario_id'].unique()
-    scenario_id_default = scenario_id_list[0]
 
 data = load_data()
 df1_all = data["df1"]
@@ -42,12 +22,13 @@ df3_all =  data["df3"]
 df4_all =  data["df4"]
 geojson_data = data["geojson_data"]
 
+scenario_id_list = df1_all['scenario_id'].unique()
+scenario_id_default = scenario_id_list[0]
 
 df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
 df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
 df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
 df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
-
     
 # === Create line plot: hwycovid (label) vs count_day and DAY_Flow ===
 line_df = df_filtered1.copy()

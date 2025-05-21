@@ -17,4 +17,3 @@ eg: 'Dash is running on http://127.0.0.1:8050/'
 4. Remember **STOP** app when you are not using it. It cost money running apps in databricks!
 
 Current Validation app: https://adb-3893261652776219.19.azuredatabricks.net/apps/validation?o=3893261652776219
-

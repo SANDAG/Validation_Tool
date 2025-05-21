@@ -1,64 +1,30 @@
-# config_databricks.py
+from databricks import sql
 import os
 import pandas as pd
-import numpy as np
 import geopandas as gpd
-from shapely import wkt
 import json
-from functools import lru_cache
-from databricks import sql
-from databricks.sdk.core import Config
+from shapely import wkt
+from dotenv import load_dotenv, find_dotenv
 
-# === Define Scenario Ids Needed===
-scenario_id_list =[1150,272,254]
+# Only load if the .env file is present
+dotenv_path = find_dotenv()
+if dotenv_path:
+    load_dotenv(dotenv_path)
 
-# === Connection setup ===
-cfg = Config()
+scenario_id_list = [1150,272,254]
+scenario_str = ','.join(map(str, scenario_id_list))
 
-@lru_cache(maxsize=1)
-def get_connection(http_path):
-    return sql.connect(
-        server_hostname=cfg.host,
-        http_path=http_path,
-        credentials_provider=lambda: cfg.authenticate,
-    )
-
-# def read_volumes(volume_name, conn):
-#     with conn.cursor() as cursor:
-#         query = f"SELECT * FROM csv.`{volume_name}` WITH ('header' = 'true')"
-#         cursor.execute(query)
-#         return cursor.fetchall_arrow().to_pandas()
-
-def read_geotable(table_name, conn):
-    with conn.cursor() as cursor:
-        query = f"SELECT scenario_id, ID, Length, geometry as Shape FROM {table_name} WHERE scenario_id = 1150"
-        cursor.execute(query)
-        return cursor.fetchall_arrow().to_pandas()
-
-def read_table(table_name, conn):
-    with conn.cursor() as cursor:
-        placeholders = ','.join(str(id) for id in scenario_id_list)
-        query = f"SELECT * FROM {table_name} WHERE scenario_id IN ({placeholders})"
-        cursor.execute(query)
-        return cursor.fetchall_arrow().to_pandas()
-
-# === Utility ===
-def clean_and_convert_columns(df, columns):
-    existing_cols = [col for col in columns if col in df.columns]
-    df_cleaned = df.dropna(subset=existing_cols).copy()
-    for col in existing_cols:
-        df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
-    return df_cleaned
-
-# === Main function ===
 def load_data():
-    http_path_input = "/sql/1.0/warehouses/41cbd7de44cc187c"
-    conn = get_connection(http_path_input)
+    with sql.connect(server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME"),
+                    http_path       = os.getenv("DATABRICKS_HTTP_PATH"),
+                    access_token    = os.getenv("DATABRICKS_TOKEN")) as connection:
+        
+        df1 = pd.read_sql(f'SELECT * FROM tam_dev.validation.fwy WHERE scenario_id IN ({scenario_str})',connection)
+        df2 = pd.read_sql(f'SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})',connection)
+        df3 = pd.read_sql(f'SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})',connection)
+        df4 = pd.read_sql(f'SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})',connection)
+        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad',connection)
 
-    df1 = read_table('tam_dev.validation.fwy', conn)
-    df2 = read_table('tam_dev.validation.all_class', conn)
-    df3 = read_table('tam_dev.validation.truck', conn)
-    df4 = read_table('tam_dev.validation.board', conn)
 
     df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df_filtered1['label'] = df_filtered1['fxnm'].fillna('Unknown') + ' to ' + df_filtered1['txnm'].fillna('Unknown')
@@ -80,14 +46,20 @@ def load_data():
         'length', 'speed_day', 'speed_ea', 'speed_am', 'speed_md', 'speed_pm', 'speed_ev'
     ]
 
+    def clean_and_convert_columns(df, columns):
+        existing_cols = [col for col in columns if col in df.columns]
+        df_cleaned = df.dropna(subset=existing_cols).copy()
+        for col in existing_cols:
+            df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
+        return df_cleaned
+
     df_filtered1 = clean_and_convert_columns(df_filtered1, columns_to_clean)
     df_filtered2 = clean_and_convert_columns(df_filtered2, columns_to_clean)
     df_filtered3 = clean_and_convert_columns(df_filtered3, columns_to_clean)
     df_filtered4 = clean_and_convert_columns(df_filtered4, columns_to_clean)
 
-    df_link = read_geotable('tam_dev.abm3.network__emme_hwy_tcad ', conn)
-    df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
 
+    df_link['geometry'] = df_link['Shape'].apply(wkt.loads)
     df_filtered2['hwycovid_str'] = df_filtered2['hwycovid'].astype(str)
     df_link['ID'] = df_link['ID'].astype(str)
     merged = df_filtered2.merge(df_link, left_on='hwycovid_str', right_on='ID', how='left')
