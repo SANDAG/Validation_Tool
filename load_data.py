@@ -1,4 +1,4 @@
-from databricks import sql
+from databricks-sql-connector import sql
 import os
 import pandas as pd
 import geopandas as gpd
@@ -23,7 +23,7 @@ def load_data():
         df2 = pd.read_sql(f'SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})',connection)
         df3 = pd.read_sql(f'SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})',connection)
         df4 = pd.read_sql(f'SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})',connection)
-        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad',connection)
+        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id is 1150',connection)
 
 
     df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()

@@ -4,13 +4,13 @@ import dash
 from dash import Dash, html, dash_table, dcc
 from dash import Input, Output, State
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import json
 import dash_leaflet as dl
 import numpy as np
-import plotly.graph_objects as go
 from dash import callback_context
 import dash_bootstrap_components as dbc
-from plotly.subplots import make_subplots
 from load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig
 
