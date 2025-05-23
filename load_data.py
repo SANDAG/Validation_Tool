@@ -5,6 +5,8 @@ import geopandas as gpd
 import json
 from shapely import wkt
 from dotenv import load_dotenv, find_dotenv
+from warnings import filterwarnings
+filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
 # Only load if the .env file is present
 dotenv_path = find_dotenv()

@@ -13,7 +13,8 @@ from dash import callback_context
 import dash_bootstrap_components as dbc
 from load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig
-
+from warnings import filterwarnings
+filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
 data = load_data()
 df1_all = data["df1"]
@@ -101,6 +102,7 @@ leaflet_map = create_map(geojson_data)
 
 # === Initialize Dash App ===
 app = Dash(__name__, suppress_callback_exceptions=True)
+server=app.server
 app.title = "SANDAG Volume Validation Dashboard"
 
 # === App Layout ===
