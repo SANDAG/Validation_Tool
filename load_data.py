@@ -8,13 +8,14 @@ from dotenv import load_dotenv, find_dotenv
 from warnings import filterwarnings
 filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
+# Define scenarios to compare in dashboard
+scenario_id_list = [1150,272,254]
+scenario_str = ','.join(map(str, scenario_id_list))
+
 # Only load if the .env file is present
 dotenv_path = find_dotenv()
 if dotenv_path:
     load_dotenv(dotenv_path)
-
-scenario_id_list = [1150,272,254]
-scenario_str = ','.join(map(str, scenario_id_list))
 
 def load_data():
     with sql.connect(server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME"),

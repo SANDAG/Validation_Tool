@@ -17,7 +17,7 @@ source_color_map = {
     'Coronado': '#C3B1E1'
 }
 
-def build_scatter_plot(df, obs_col, model_col):
+def build_scatter_plot(df, obs_col, model_col,id_column):
     """
     Create scatter plot with regression line for observed vs model volume.
 
@@ -25,6 +25,7 @@ def build_scatter_plot(df, obs_col, model_col):
         df (pd.DataFrame): Filtered dataframe with relevant scenario.
         obs_col (str): Column name for observed values (e.g., 'count_day', 'truckaadt').
         model_col (str): Column name for modeled values (e.g., 'day_flow', 'truckflow').
+        id_column: id column in df
 
     Returns:
         go.Figure: Plotly figure with points and best fit line.
@@ -32,7 +33,9 @@ def build_scatter_plot(df, obs_col, model_col):
         float: slope of regression line.
         float: prmse (as % of mean observed).
     """
-    scatter_df = df[[obs_col, model_col, 'hwycovid']].dropna()
+    scatter_df = df[[obs_col, model_col, id_column]].dropna()
+    q_high = scatter_df[obs_col].quantile(0.99)
+    scatter_df = scatter_df[scatter_df[obs_col] <= q_high]
     x = scatter_df[obs_col]
     y = scatter_df[model_col]
     
@@ -51,7 +54,7 @@ def build_scatter_plot(df, obs_col, model_col):
         scatter_df,
         x=obs_col,
         y=model_col,
-        custom_data=['hwycovid'],
+        custom_data=[id_column],
         labels={obs_col: 'Observed Count', model_col: 'Model Flow'},
         color_discrete_sequence=["#08306b"],
         opacity=0.5
@@ -119,8 +122,10 @@ def build_source_ring_chart(df, source_col='source'):
         'San Diego': '#F6C800',
         'Chula Vista': '#F65166',
         'Carlsbad': '#49C2D6',
+        'MTS':'#49C2D6',
         'El Cajon': '#F2762E',
         'Oceanside': '#2E87C8',
+        'NCTD':'#2E87C8',
         'Del Mar': '#A3E7D8',
         'Coronado': '#C3B1E1'
     }
@@ -129,7 +134,7 @@ def build_source_ring_chart(df, source_col='source'):
     source_dist.columns = ['Source', 'Count']
     source_dist['Percent'] = round(100 * source_dist['Count'] / source_dist['Count'].sum())
 
-    colors = [source_color_map.get(src, '#CCCCCC') for src in source_dist['Source']]
+    colors = [source_color_map.get(src, '#49C2D6') for src in source_dist['Source']]
 
     fig = go.Figure(go.Pie(
         labels=source_dist['Source'],
@@ -281,4 +286,133 @@ def make_vmt_fig(df_vmt, group_col, title):
     
     return fig
 
+def make_bar_figures(result_df, count_df, selected_group, x_axis_fixed=None):
+    import plotly.graph_objects as go
 
+    if x_axis_fixed is None:
+        x_axis_fixed = list(result_df['Group'])
+
+    # === Bar 1: R² + Slope
+    fig1 = go.Figure()
+    fig1.add_trace(go.Bar(
+        x=result_df['Group'],
+        y=result_df['R_squared'],
+        name='R²',
+        marker_color='#08306b',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    fig1.add_trace(go.Bar(
+        x=result_df['Group'],
+        y=result_df['Slope'],
+        name='Slope',
+        marker_color='#F65166',
+        marker=dict(opacity=[1 if g == selected_group or selected_group is None else 0.3 for g in result_df['Group']])
+    ))
+    fig1.update_layout(
+        barmode='group',
+        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+        margin=dict(t=0, b=0, l=0, r=0),
+        showlegend=False
+    )
+
+    # === Bar 2: PRMSE
+    fig2 = go.Figure()
+    for _, row in result_df.iterrows():
+        fig2.add_trace(go.Bar(
+            x=[row['Group']],
+            y=[row['PRMSE']],
+            marker_color='#08306b',
+            opacity=1 if row['Group'] == selected_group or selected_group is None else 0.3,
+            showlegend=False
+        ))
+    fig2.update_layout(
+        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+        margin=dict(t=0, b=0, l=0, r=0),
+        showlegend=False
+    )
+
+    # === Bar 3: Count
+    fig3 = go.Figure()
+    for _, row in count_df.iterrows():
+        fig3.add_trace(go.Bar(
+            x=[row['Group']],
+            y=[row['Num_Observed']],
+            marker_color='#08306b',
+            opacity=1 if row['Group'] == selected_group or selected_group is None else 0.3,
+            showlegend=False
+        ))
+    fig3.update_layout(
+        xaxis=dict(tickangle=30, categoryorder='array', categoryarray=x_axis_fixed),
+        margin=dict(t=0, b=0, l=0, r=0),
+        showlegend=False
+    )
+
+    return fig1, fig2, fig3
+
+def bar_scatter_layout(
+    bar_id, bar2_id, count_id,
+    scatter_id, ring_id, stat_id,
+    slope_all, r_squared_all, prmse_all, total_obs_all,
+    show_groupby_selector=True
+):
+    selector_div = html.Div([
+        html.H3("R² and Slope", style={'marginRight': '20px'}),
+    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'}) if not show_groupby_selector else html.Div([
+        html.H3("R² and Slope", style={'marginRight': '20px'}),
+        dcc.Dropdown(
+            id='groupby_selector',
+            options=[
+                {'label': 'By PMSA', 'value': 'pmsa_nm'},
+                {'label': 'By City', 'value': 'city_nm'},
+                {'label': 'By Volume Category', 'value': 'vcategory'},
+                {'label': 'By Road Class', 'value': 'rdclass'}
+            ],
+            value='rdclass',
+            clearable=False,
+            style={'width': '200px'}
+        )
+    ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '5px'})
+
+    # LEFT COLUMN — bar charts
+    left_column = html.Div([
+        selector_div,
+        dcc.Graph(id=bar_id, style={'height': '36%', 'marginBottom': '0px'}),
+        html.H3("PRMSE", style={'marginTop': '5px'}),
+        dcc.Graph(id=bar2_id, style={'height': '30%', 'marginBottom': '0px'}),
+        html.H3("Number of Observed Counts", style={'marginTop': '5px'}),
+        dcc.Graph(id=count_id, style={'height': '30%'})
+    ], style={'flex': '1', 'padding': '5px', 'boxSizing': 'border-box', 'width': '33.3%', 'height': '100%'})
+
+    # MIDDLE COLUMN — scatter, ring, stats
+    middle_column = html.Div([
+        html.H3("Model Day Flow VS Observed Daily Count"),
+        dcc.Graph(id=scatter_id, style={'flex': '7', 'width': '100%', 'padding': '0', 'margin': '0'}),
+
+        html.Div([
+            html.Div([
+                dcc.Graph(id=ring_id, config={'displayModeBar': False},
+                          style={'height': '300px', 'width': '300px'})
+            ], style={'flex': '1', 'display': 'flex', 'padding': '0', 'margin': '0',
+                      'justifyContent': 'center', 'alignItems': 'center'}),
+
+            html.Div(id=stat_id, children=[
+                html.Div([html.H3(f"{slope_all:.2f}", style={'margin': '0', 'fontSize': '20px'}), html.Small("Slope")],
+                         style={'textAlign': 'center', 'marginBottom': '10px'}),
+                html.Div([html.H3(f"{r_squared_all:.2f}", style={'margin': '0', 'fontSize': '20px'}), html.Small("R²")],
+                         style={'textAlign': 'center', 'marginBottom': '10px'}),
+                html.Div([html.H3(f"{prmse_all:.2f}", style={'margin': '0', 'fontSize': '20px'}), html.Small("PRMSE")],
+                         style={'textAlign': 'center', 'marginBottom': '10px'}),
+                html.Div([html.H3(f"{total_obs_all}", style={'margin': '0', 'fontSize': '20px'}), html.Small("Count")],
+                         style={'textAlign': 'center'})
+            ], style={
+                'flex': '1',
+                'padding': '0',
+                'display': 'flex',
+                'flexDirection': 'column',
+                'justifyContent': 'center'
+            })
+        ], style={'display': 'flex', 'flexDirection': 'row', 'flex': '3', 'width': '100%',
+                  'padding': '0', 'margin': '0'})
+    ], style={'flex': '1', 'padding': '0', 'boxSizing': 'border-box', 'width': '33.3%', 'height': '100%'})
+
+    return left_column, middle_column
