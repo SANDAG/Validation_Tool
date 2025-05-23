@@ -81,9 +81,10 @@ line_fig.update_layout(
 )
 
 # === Scatter Plot: count_day vs DAY_Flow ===
-scatter_fig, r2, slope, prmse = build_scatter_plot(df_filtered2, 'count_day', 'day_flow')
+# scatter_fig, r2, slope, prmse = build_scatter_plot(df_filtered2, 'count_day', 'day_flow')
+
 # for truck:
-scatter_fig_t, r2_t, slope_t, prms_te = build_scatter_plot(df3, 'truckaadt', 'truckflow')
+# scatter_fig_t, r2_t, slope_t, prms_te = build_scatter_plot(df3, 'truckaadt', 'truckflow')
 
 # === Compute Overall Stats for Display ===
 slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_filtered2, 'count_day', 'day_flow')
@@ -93,10 +94,10 @@ slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_sta
 # === Call Function to create map ===
 leaflet_map = create_map(geojson_data)
 
-# === Create Ring Chart for 'source' Distribution ===
-source_fig = build_source_ring_chart(df_filtered2)
-# or for truck
-source_fig_t = build_source_ring_chart(df3)
+# # === Create Ring Chart for 'source' Distribution ===
+# source_fig = build_source_ring_chart(df_filtered2)
+# # or for truck
+# source_fig_t = build_source_ring_chart(df3)
 
 # === Initialize Dash App ===
 app = Dash(__name__, suppress_callback_exceptions=True)
