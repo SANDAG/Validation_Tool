@@ -1,19 +1,24 @@
 # Validation_Tool
 
-- Test Locally
-1. Set up a seperate environment according to local_environment.yaml
-2. Make sure you can access T drive (connect to VPN if needed)
-3. Clone the repo in the location you want
-4. Open terminal and input command'python app.py'
-5. Wait for page loading and then click the link in the ouput
-eg: 'Dash is running on http://127.0.0.1:8050/'
-6. To close app, kill or end terminal
+## File structure:
+- app.py: main script defining the layout of dash app. Including page layout design, scenario selector, menu and page switching and callbacks.
+- load_data.py: script to read data from databricks
+- validation_plot_generator: includes a series functions about generating graphs, maps and layouts
+  
+## Deployment on Azure Web Service:
+- set up environment variables (use token to read data from databricks)
+- set up start up command under configuration
+
+![image](https://github.com/user-attachments/assets/ca3025c9-fb6e-4b84-bd95-124b1d0c60ff)
+
+## Deployment in Local environment:
+- set up .env file
+  
+> DATABRICKS_SERVER_HOSTNAME = https://adb-3893261652776219.19.azuredatabricks.net/
+>
+> DATABRICKS_HTTP_PATH = /sql/1.0/warehouses/41cbd7de44cc187c
+> 
+> DATABRICKS_TOKEN = your_token
 
 
-- Test on Databricks
-1. Create a git folder. And Clone from this repo
-2. Create a app in Databricks. After starting the compute, deploy from the git folder you just created.
-3. Make sure you have access to compute resource and data stored in catelog. Otherwise app will crash.
-4. Remember **STOP** app when you are not using it. It cost money running apps in databricks!
-
-Current Validation app: https://adb-3893261652776219.19.azuredatabricks.net/apps/validation?o=3893261652776219
+Current Validation app:  https://validation-tool-hzhfg6cmgggndbh5.westus-01.azurewebsites.net/
