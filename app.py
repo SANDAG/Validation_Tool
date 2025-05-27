@@ -40,7 +40,7 @@ slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_sta
 leaflet_map = create_map(geojson_data)
 
 # === Initialize Dash App ===
-app = Dash(__name__, suppress_callback_exceptions=True)
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 server=app.server
 app.title = "SANDAG Volume Validation Dashboard"
 
