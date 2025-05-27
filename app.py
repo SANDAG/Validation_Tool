@@ -880,4 +880,4 @@ def update_table_and_ring(corridors, metric,scenario_id):
 
 # === Run App ===
 if __name__ == '__main__':
-    app.run(debug=True, port=8050)
+    app.run(debug=True)
