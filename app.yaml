@@ -1,5 +1,0 @@
-command: [
-  "python",
-  "app.py"
-]
-packages: file:requirements.txt
