@@ -41,7 +41,7 @@ leaflet_map = create_map(geojson_data)
 
 # === Initialize Dash App ===
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
-server=app.server
+server = app.server
 app.title = "SANDAG Volume Validation Dashboard"
 
 # === App Layout ===

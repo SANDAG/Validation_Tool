@@ -3,8 +3,3 @@ command: [
   "app.py"
 ]
 packages: file:requirements.txt
-env:
-  - name: 'ENV'
-    value: 'databricks'
-  - name: 'SCENARIO_ID'
-    value: '254'

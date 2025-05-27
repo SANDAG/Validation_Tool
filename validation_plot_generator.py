@@ -57,7 +57,7 @@ def build_scatter_plot(df, obs_col, model_col,id_column):
         custom_data=[id_column],
         labels={obs_col: 'Observed Count', model_col: 'Model Flow'},
         color_discrete_sequence=["#08306b"],
-        opacity=0.5
+        opacity=0.4
     )
     fig.update_traces(marker=dict(size=9))
     fig.add_trace(go.Scatter(
