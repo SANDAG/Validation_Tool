@@ -3,4 +3,5 @@
 assets/
 __pycache__/
 .env
-venv/
+venv_1/
+venv_2/

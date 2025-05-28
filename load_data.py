@@ -11,6 +11,7 @@ filterwarnings("ignore", category=UserWarning, message='.*pandas only supports S
 # Define scenarios to compare in dashboard
 scenario_id_list = [1150,272,254]
 scenario_str = ','.join(map(str, scenario_id_list))
+default_scenario = scenario_id_list[0]
 
 # Only load if the .env file is present
 dotenv_path = find_dotenv()
@@ -26,7 +27,8 @@ def load_data():
         df2 = pd.read_sql(f'SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})',connection)
         df3 = pd.read_sql(f'SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})',connection)
         df4 = pd.read_sql(f'SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})',connection)
-        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = 1150',connection)
+        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = ({default_scenario})',connection)
+        df_route = pd.read_sql(f'SELECT scenario_id, route_name, earlyam_hours, evening_hous, transit_route_shape  as Shape FROM tam_dev.abm3.network__transit_route WHERE scenario_id = ({default_scenario})',connection)
 
 
     df_filtered1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
