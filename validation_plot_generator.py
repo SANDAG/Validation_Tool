@@ -34,8 +34,8 @@ def build_scatter_plot(df, obs_col, model_col,id_column):
         float: prmse (as % of mean observed).
     """
     scatter_df = df[[obs_col, model_col, id_column]].dropna()
-    q_high = scatter_df[obs_col].quantile(0.99)
-    scatter_df = scatter_df[scatter_df[obs_col] <= q_high]
+    # q_high = scatter_df[obs_col].quantile(0.99)
+    # scatter_df = scatter_df[scatter_df[obs_col] <= q_high]
     x = scatter_df[obs_col]
     y = scatter_df[model_col]
     
@@ -152,59 +152,62 @@ def build_source_ring_chart(df, source_col='source'):
 
     return fig
 
-# Define a simple hover style
-hover_style = dict(weight=5, color='#666', dashArray='', fillOpacity=0.7)
-# === Define style function directly in JavaScript ===
-# This approach avoids issues with the arrow_function
-style_function = assign("""function(feature, context) {
-    const props = context && context.props ? context.props : {};
-    const hideout = context.hideout || {};
-    const highlight_id = hideout.highlight_id;
-    const isHighlighted = feature.properties.hwycovid == highlight_id;
 
-    if (isHighlighted) {
-        return { color: "yellow", weight: 6, opacity: 1.0 };
-    }
-
-    const gap = feature.properties.gap_day;
-    let color = 'gray';
-
-    if (gap !== null && gap !== undefined) {
-        if (gap < -10) {
-            color = '#08306b';
-        } else if (gap < -5) {
-            color = '#485187';
-        } else if (gap < 0) {
-            color = '#6C649F';
-        } else if (gap < 5) {
-            color = '#9057A3';
-        } else if (gap < 10) {
-            color = '#B44691';
-        } else {
-            color = '#F65166';
-        }
-    }
-
-    if (isHighlighted) {
-        return {
-            color: 'yellow',
-            weight: 7,
-            opacity: 1.0
-        };
-    }
-
-    return {
-        color: color,
-        weight: 2,
-        opacity: 0.8
-    };
-}""")
 # === Create Leaflet Map ===
-def create_map(geojson_data):
+def create_map(geojson_data,id_field):
+    # Define a simple hover style
+    hover_style = dict(weight=5, color='#666', dashArray='', fillOpacity=0.7)
+    # === Define style function directly in JavaScript ===
+    # This approach avoids issues with the arrow_function
+    style_function = assign("""function(feature, context) {
+        const hideout = context.hideout || {};
+        const highlight_id = hideout.highlight_id;
+        const id_field = hideout.id_field;
+
+        const feature_id = feature.properties[id_field];
+        const isHighlighted = highlight_id !== null && feature_id == highlight_id;
+
+        if (isHighlighted) {
+            return { color: "yellow", weight: 6, opacity: 1.0 };
+        }
+
+        const gap = feature.properties.gap_day;
+        let color = 'gray';
+
+        if (gap !== null && gap !== undefined) {
+            if (gap < -10) {
+                color = '#08306b';
+            } else if (gap < -5) {
+                color = '#485187';
+            } else if (gap < 0) {
+                color = '#6C649F';
+            } else if (gap < 5) {
+                color = '#9057A3';
+            } else if (gap < 10) {
+                color = '#B44691';
+            } else {
+                color = '#F65166';
+            }
+        }
+
+        if (isHighlighted) {
+            return {
+                color: 'yellow',
+                weight: 7,
+                opacity: 1.0
+            };
+        }
+
+        return {
+            color: color,
+            weight: 2,
+            opacity: 0.8
+        };
+    }""")
     return dl.Map(
         id='map',
         center=[32.9, -117],
-        zoom=10,  # zoom will now work since we removed zoomToBounds
+        zoom=10, 
         children=[
             dl.TileLayer(
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
@@ -416,3 +419,28 @@ def bar_scatter_layout(
     ], style={'flex': '1', 'padding': '0', 'boxSizing': 'border-box', 'width': '33.3%', 'height': '100%'})
 
     return left_column, middle_column
+
+def prepare_boarding_tables(df):
+    time_periods = ['ea', 'am', 'md', 'pm', 'ev', 'day']
+    mode_col = 'mode_name'
+    # Observed
+    observed = df.groupby(mode_col)[[f'board_{tp}' for tp in time_periods]].sum().round(0)
+
+    # Model
+    model = df.groupby(mode_col)[[f'{tp}_board' for tp in time_periods]].sum().round(0)
+    model.columns = [f'board_{tp}' for tp in time_periods]  # Rename to match observed for easier comparison
+
+    # Difference
+    diff = model - observed
+    diff = diff.round(0)
+
+    # Gap (%)
+    gap = ((model - observed) / observed.replace(0, np.nan) * 100).round(0).astype('Int64')
+
+    # Add totals
+    observed.loc['Total'] = observed.sum()
+    model.loc['Total'] = model.sum()
+    diff.loc['Total'] = diff.sum()
+    gap.loc['Total'] = gap.mean().round(0).astype('Int64')  # use average for gap
+
+    return observed, model, diff, gap

@@ -12,7 +12,7 @@ import numpy as np
 from dash import callback_context
 import dash_bootstrap_components as dbc
 from load_data import load_data
-from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures
+from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures,prepare_boarding_tables
 from warnings import filterwarnings
 filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
@@ -22,6 +22,8 @@ df2_all = data["df2"]
 df3_all =  data["df3"]
 df4_all =  data["df4"]
 geojson_data = data["geojson_data"]
+geojson_data_r = data["geojson_data_r"]
+df_scenario = data['df_scenario']
 
 scenario_id_list = df1_all['scenario_id'].unique()
 scenario_id_default = scenario_id_list[0]
@@ -37,7 +39,8 @@ slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_fi
 slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
 
 # === Call Function to create map ===
-leaflet_map = create_map(geojson_data)
+leaflet_map = create_map(geojson_data,'hwycovid')
+leaflet_map_r = create_map(geojson_data_r,'route_str')
 
 # === Initialize Dash App ===
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
@@ -150,13 +153,20 @@ def page_board_validation():
         left_col,
         middle_col,
         html.Div([
-            html.H3("Map: Gap Day by Hwy Coverage ID"),
-            leaflet_map
+            html.H3("Map: Gap Day by Route  ID"),
+            leaflet_map_r
         ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box', 'height': '100%', 'width': '33.3%'})
     ], style={'display': 'flex', 'width': '100%', 'height': '700px'})
 
+# === board table page===
+def page_transit_boarding_summary():
+    return  html.Div([
+        html.H2("Boardings by Mode and TOD", style={'textAlign': 'center'}),
+        html.Div(id='boarding_table_container')
+    ])
 
-# === Define Page 2 Layout: Volume Validation by Hwy ===
+
+# === Volume Validation by Hwy ===
 def page_volume_by_hwy():
     all_corridors = sorted(df_filtered1['nm'].dropna().unique())
     corridor_options = [{'label': 'ALL', 'value': 'ALL'}] + [{'label': nm, 'value': nm} for nm in all_corridors]
@@ -254,7 +264,9 @@ def page_vmt_comparison():
         ], style={'height': 'calc(100vh - 80px)'})  # Adjust to exclude H2 + padding
     ], style={'padding': '10px', 'height': '100vh', 'boxSizing': 'border-box',})
 
-
+scenario_options = [
+{"label": f"{row['scenario_id']}: {row['scenario_name']}", "value": row["scenario_id"]}
+for _, row in df_scenario.iterrows()]
 
 # === Full App Layout with Collapsible Sidebar ===
 app.layout = html.Div([
@@ -266,10 +278,10 @@ app.layout = html.Div([
         html.Div("Scenario:", style={'marginRight': '5px', 'fontWeight': 'bold'}),
         dcc.Dropdown(
             id='scenario_selector',
-            options=[{'label': str(sid), 'value': sid} for sid in sorted(set(scenario_id_list))],
-            value=scenario_id_list[0],  # Default to the first one
+            options=scenario_options,
+            value= scenario_id_list[0],  # default
             clearable=False,
-            style={'width': '120px'}
+            style={'width': '300px'}
         )
     ], style={
         'position': 'fixed',
@@ -294,7 +306,8 @@ app.layout = html.Div([
         dcc.Link("Highway Volume Validation", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
         dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'}),
         dcc.Link("Truck Volume Validation", href="/truck_validation", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Board Validation", href="/board_validation", style={'display': 'block', 'margin': '10px'})
+        dcc.Link("Transit Validation", href="/transit_validation", style={'display': 'block', 'margin': '10px'}),
+        dcc.Link("Transit Boarding Summary", href="/transit_boarding_summary", style={'display': 'block', 'margin': '10px'})
     ], style={
         'position': 'fixed',
         'top': '60px', 
@@ -337,8 +350,10 @@ def update_page(pathname, scenario_id):
         return page_vmt_comparison()
     elif pathname == '/truck_validation':
         return page_truck_validation()
-    elif pathname == '/board_validation':
+    elif pathname == '/transit_validation':
         return page_board_validation()
+    elif pathname == '/transit_boarding_summary':
+        return page_transit_boarding_summary()
     return page_volume_validation()
 
 
@@ -373,13 +388,19 @@ def show_popup(clickData):
         return "No feature selected"
 
     props = clickData["properties"]
+    labels = {
+        "hwycovid": "Hwy ID",
+        "route_name_id": "Route ID",
+        "gap_day_all_class": "Volume Gap Day (All Class)",
+        "vmt_gap_day_all_class": "VMT Gap Day (All Class)",
+        "gap_day_truck": "Truck Volume Gap Day",
+        "vmt_gap_day_truck": "Truck VMT Gap Day",
+        "transit_gap_day": "Transit Gap Day"
+    }
 
     return html.Div([
-        f"Hwy ID: {props.get('hwycovid', 'N/A')}",
-        html.Br(),
-        f"Volume Gap Day: {props.get('gap_day', 'N/A')}%",
-        html.Br(),
-        f"VMT Gap Day: {props.get('vmt_gap_day', 'N/A')}%"
+        html.Div(f"{label}: {props[key]}%") if 'gap' in key or 'vmt' in key else html.Div(f"{label}: {props[key]}")
+        for key, label in labels.items() if key in props and props[key] is not None
     ])
 
 # === Map Highlight Callback ===
@@ -395,7 +416,7 @@ def zoom_from_scatter(clickData, hideout):
         return hideout, dash.no_update, dash.no_update
 
     selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout)
+    return get_map_center(selected_id, hideout, geojson_data, 'hwycovid')
 
 @app.callback(
     Output("geojson", "hideout", allow_duplicate=True),
@@ -409,7 +430,22 @@ def zoom_from_truck_scatter(clickData, hideout):
     if not clickData:
         return hideout, dash.no_update, dash.no_update
     selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout)
+    return get_map_center(selected_id, hideout,geojson_data, 'hwycovid')
+
+@app.callback(
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("map", "center", allow_duplicate=True),
+    Output("map", "zoom", allow_duplicate=True),
+    Input("board_scatter", "clickData"),
+    State("geojson", "hideout"),
+    prevent_initial_call=True
+)
+def zoom_from_board_scatter(clickData, hideout):
+    if not clickData:
+        return hideout, dash.no_update, dash.no_update
+
+    selected_id = clickData["points"][0]["customdata"][0]
+    return get_map_center(selected_id, hideout,geojson_data_r, 'route_str')
 
 @app.callback(
     Output("geojson", "hideout", allow_duplicate=True),
@@ -424,12 +460,13 @@ def zoom_from_line(clickData, hideout):
         return hideout, dash.no_update, dash.no_update
 
     selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout)
+    return get_map_center(selected_id, hideout,geojson_data, 'hwycovid')
 
-def get_map_center(selected_id, hideout):
+def get_map_center(selected_id, hideout, df, id):
     hideout["highlight_id"] = selected_id
-    for feature in geojson_data["features"]:
-        if feature["properties"]["hwycovid"] == selected_id:
+    hideout["id_field"] = id
+    for feature in df["features"]:
+        if str(feature["properties"].get(id)) == str(selected_id):
             coords = feature["geometry"]["coordinates"]
             mid_idx = len(coords) // 2
             center = coords[mid_idx][::-1]
@@ -877,6 +914,38 @@ def update_table_and_ring(corridors, metric,scenario_id):
     fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
 
     return columns, data, fig
+
+@app.callback(
+    Output('boarding_table_container', 'children'),
+    Input('scenario_selector', 'value')
+)
+def update_boarding_tables(scenario_id):
+    df4 = df4_all[df4_all['scenario_id'] == scenario_id]
+    observed, model, diff, gap = prepare_boarding_tables(df4)
+
+    def make_table(df, title):
+        return html.Div([
+            html.H4(title),
+            dash_table.DataTable(
+                columns=[{"name": col.upper(), "id": col} for col in df.reset_index().columns],
+                data=df.reset_index().to_dict("records"),
+                style_table={'overflowX': 'auto'},
+                style_cell={'padding': '4px', 'textAlign': 'center'},
+                style_header={'fontWeight': 'bold', 'backgroundColor': '#f0f0f0'}
+            )
+        ], style={'margin': '10px', 'width': '48%'})
+
+    return html.Div([
+        html.Div([
+            make_table(observed, "Observed Boardings"),
+            make_table(diff, "Boardings Difference"),
+        ], style={'display': 'flex', 'justifyContent': 'space-between'}),
+
+        html.Div([
+            make_table(model, "Model Boardings"),
+            make_table(gap, "Boardings Gap(%)"),
+        ], style={'display': 'flex', 'justifyContent': 'space-between'})
+    ])
 
 # === Run App ===
 if __name__ == '__main__':
