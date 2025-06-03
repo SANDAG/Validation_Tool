@@ -4,7 +4,8 @@
 ## File structure:
 
 - app.py: main script defining the layout of dash app. Including page layout design, scenario selector, menu and page switching and callbacks.
-- load_data.py: script to read data from databricks
+- Azure_load_data.py: script to read data from databricks
+- Local_load_data.py: script to read data from T drive
 - validation_plot_generator.py: includes a series functions about generating graphs, maps and layouts
 - requirements.txt: required python packages (for both local and Azure web service)
 - git workflow: automatically update changes into Azure web service and redeploy
