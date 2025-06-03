@@ -209,7 +209,7 @@ def create_map(geojson_data,id_field):
 
         return {
             color: color,
-            weight: 2,
+            weight: 3,
             opacity: 0.8
         };
     }""")
