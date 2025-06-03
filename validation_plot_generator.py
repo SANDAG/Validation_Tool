@@ -93,13 +93,22 @@ def compute_overall_stats(df, obs_col, model_col):
     mask_all = ~np.isnan(x_all) & ~np.isnan(y_all)
     x_clean = x_all[mask_all]
     y_clean = y_all[mask_all]
-
-    slope, intercept = np.polyfit(x_clean, y_clean, 1)
-    y_pred = slope * x_clean + intercept
-    r_squared = 1 - np.sum((y_clean - y_pred)**2) / np.sum((y_clean - y_clean.mean())**2)
-    rmse = np.sqrt(np.mean((y_clean - y_pred)**2))
-    prmse = (rmse / y_clean.mean()) * 100 if y_clean.mean() != 0 else np.nan
     total_count = len(x_clean)
+
+    if total_count == 1:
+        x_val = x_clean.iloc[0]
+        y_val = y_clean.iloc[0]
+
+        slope = y_val / x_val if x_val != 0 else np.nan
+        r_squared = np.nan
+        prmse = ((y_val - x_val) / y_val) * 100 if y_val != 0 else np.nan
+
+    elif total_count >= 2:
+        slope, intercept = np.polyfit(x_clean, y_clean, 1)
+        y_pred = slope * x_clean + intercept
+        r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
+        rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
+        prmse = (rmse / y_clean.mean()) * 100 if y_clean.mean() != 0 else np.nan
 
     return slope, r_squared, prmse, total_count
 
