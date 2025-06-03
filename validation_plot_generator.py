@@ -109,6 +109,9 @@ def compute_overall_stats(df, obs_col, model_col):
         r_squared = 1 - np.sum((y_clean - y_pred) ** 2) / np.sum((y_clean - y_clean.mean()) ** 2)
         rmse = np.sqrt(np.mean((y_clean - y_pred) ** 2))
         prmse = (rmse / y_clean.mean()) * 100 if y_clean.mean() != 0 else np.nan
+    
+    else:
+        slope, r_squared, prmse = np.nan, np.nan, np.nan
 
     return slope, r_squared, prmse, total_count
 
