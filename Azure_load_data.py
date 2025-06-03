@@ -16,6 +16,7 @@ if dotenv_path:
 raw_ids = os.getenv("scenario_id_list", "")
 scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
 scenario_str = ','.join(map(str, scenario_id_list))
+default_scenario = 1150
 
 # Load data from Databricks catalog
 def load_data():
