@@ -40,8 +40,8 @@ geojson_data = data["geojson_data"]
 geojson_data_r = data["geojson_data_r"]
 df_scenario = data['df_scenario']
 
-scenario_id_list = df1_all['scenario_id'].unique()
-scenario_id_default = 1150
+scenario_id_list = df_scenario['scenario_id'].unique()
+scenario_id_default = scenario_id_list[0]
 df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
 df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
 df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
