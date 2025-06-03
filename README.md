@@ -25,10 +25,11 @@
 
 ![image](https://github.com/user-attachments/assets/ca3025c9-fb6e-4b84-bd95-124b1d0c60ff)
 
-Current Validation app:  https://validation-tool-hzhfg6cmgggndbh5.westus-01.azurewebsites.net/
-
 - Define the scenarios that you want to compare in Environment variables
+  
+![image](https://github.com/user-attachments/assets/83374ea8-bc83-4796-9a4c-fb959d249d0c)
 
+Current Validation app:  https://validation-tool-hzhfg6cmgggndbh5.westus-01.azurewebsites.net/
 
 ## Deployment in Local environment:
 
