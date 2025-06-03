@@ -316,13 +316,21 @@ app.layout = html.Div([
     html.Div(id='sidebar-content', children=[
         html.H2(" "),
         html.Hr(),
-        dcc.Link("All Class Volume Validation", href="/", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Highway Volume Validation", href="/volume_by_hwy", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("VMT Validation", href="/vmt_comparison", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Truck Volume Validation", href="/truck_validation", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Transit Validation", href="/transit_validation", style={'display': 'block', 'margin': '10px'}),
-        dcc.Link("Transit Boarding Summary", href="/transit_boarding_summary", style={'display': 'block', 'margin': '10px'})
-    ], style={
+
+        html.Div("All Class", style={'fontWeight': 'bold', 'margin': '20px 0 0 10px'}),
+        dcc.Link("All Class Volume Validation", href="/", style={'display': 'block', 'marginLeft': '20px'}),
+        dcc.Link("All Class VMT Validation", href="/vmt_comparison", style={'display': 'block', 'marginLeft': '20px'}),
+
+        html.Div("Highway", style={'fontWeight': 'bold', 'margin': '20px 0 0 10px'}),
+        dcc.Link("Highway Volume & VMT Validation", href="/volume_by_hwy", style={'display': 'block', 'marginLeft': '20px'}),
+
+        html.Div("Truck", style={'fontWeight': 'bold', 'margin': '20px 0 0 10px'}),
+        dcc.Link("Truck Volume Validation", href="/truck_validation", style={'display': 'block', 'marginLeft': '20px'}),
+
+        html.Div("Transit", style={'fontWeight': 'bold', 'margin': '20px 0 0 10px'}),
+        dcc.Link("Transit Volume Validation", href="/transit_validation", style={'display': 'block', 'marginLeft': '20px'}),
+        dcc.Link("Transit Boarding Summary", href="/transit_boarding_summary", style={'display': 'block', 'marginLeft': '20px'}),
+    ],  style={
         'position': 'fixed',
         'top': '60px', 
         'left': '-200px',
@@ -330,8 +338,10 @@ app.layout = html.Div([
         'height': 'calc(100vh - 60px)',
         'backgroundColor': '#f8f9fa',
         'padding': '20px',
+        'fontSize': '14px',
         'boxSizing': 'border-box',
         'zIndex': '1000',
+        'fontFamily': 'Open Sans, verdana, arial, sans-serif',
         'transition': 'left 0.3s'
     }),
 
