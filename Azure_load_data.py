@@ -8,15 +8,14 @@ from dotenv import load_dotenv, find_dotenv
 from warnings import filterwarnings
 filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
-# Define scenarios to compare in dashboard
-scenario_id_list = [1150,272,254]
-scenario_str = ','.join(map(str, scenario_id_list))
-default_scenario = scenario_id_list[0]
-
-# Only load if the .env file is present (for local running only)
 dotenv_path = find_dotenv()
 if dotenv_path:
     load_dotenv(dotenv_path)
+
+# Define scenarios to compare in dashboard
+raw_ids = os.getenv("scenario_id_list", "")
+scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
+scenario_str = ','.join(map(str, scenario_id_list))
 
 # Load data from Databricks catalog
 def load_data():

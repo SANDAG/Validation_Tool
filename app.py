@@ -11,10 +11,25 @@ import dash_leaflet as dl
 import numpy as np
 from dash import callback_context
 import dash_bootstrap_components as dbc
-from load_data import load_data
+from Azure_load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures,prepare_boarding_tables
 from warnings import filterwarnings
 filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
+
+# Identify Environment
+if "DATABRICKS_HTTP_PATH" in os.environ:
+    ENV = "Azure"
+else:
+    ENV = "local"
+
+print(f"✅ Running in environment: {ENV}")
+
+# Import data according to environment
+if ENV == "local":
+    from Local_load_data import load_data
+
+else:
+    from Azure_load_data import load_data
 
 data = load_data()
 df1_all = data["df1"]
@@ -26,8 +41,7 @@ geojson_data_r = data["geojson_data_r"]
 df_scenario = data['df_scenario']
 
 scenario_id_list = df1_all['scenario_id'].unique()
-scenario_id_default = scenario_id_list[0]
-
+scenario_id_default = 1150
 df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
 df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
 df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
@@ -740,10 +754,10 @@ def update_board(click1, click2, click3, scenario_id, current_fig1):
 
     for group_val, group in df.groupby(groupby_col):
         slope, r2, prmse, count = compute_overall_stats(group, obs_col, model_col)
-        if not np.isnan(slope):
-            result_df.append({'Group': group_val, 'R_squared': round(r2, 2),
-                              'Slope': round(slope, 2), 'PRMSE': round(prmse, 2)})
-            count_df.append({'Group': group_val, 'Num_Observed': count})
+
+        result_df.append({'Group': group_val, 'R_squared': round(r2, 2),
+                            'Slope': round(slope, 2), 'PRMSE': round(prmse, 2)})
+        count_df.append({'Group': group_val, 'Num_Observed': count})
 
     result_df = pd.DataFrame(result_df)
     count_df = pd.DataFrame(count_df)

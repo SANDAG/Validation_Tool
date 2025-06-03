@@ -13,25 +13,29 @@
 ## Deployment on Azure Web Service:
 
 - set up environment variables (use token to read data from databricks)
-   DATABRICKS_SERVER_HOSTNAME, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN
-  
-- set up start up command under configuration
-
-![image](https://github.com/user-attachments/assets/ca3025c9-fb6e-4b84-bd95-124b1d0c60ff)
-
-
-## Deployment in Local environment:
-
-- set up .env file
   
 ` DATABRICKS_SERVER_HOSTNAME = https://adb-3893261652776219.19.azuredatabricks.net/ `
 
 ` DATABRICKS_HTTP_PATH = /sql/1.0/warehouses/41cbd7de44cc187c `
 
 ` DATABRICKS_TOKEN = your_token `
+  
+- set up start up command under configuration
 
+![image](https://github.com/user-attachments/assets/ca3025c9-fb6e-4b84-bd95-124b1d0c60ff)
 
 Current Validation app:  https://validation-tool-hzhfg6cmgggndbh5.westus-01.azurewebsites.net/
+
+- Define the scenarios that you want to compare in Environment variables
+
+
+## Deployment in Local environment:
+
+- Makre sure you have access to T drive. Connect to VPN if needed
+
+- Run `python app.py` and preview the dashboard in http://127.0.0.1:8050/
+
+- Note that local version only have one scenario 1150
 
 ## Development Process
 

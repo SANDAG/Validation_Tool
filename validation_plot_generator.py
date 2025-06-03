@@ -94,9 +94,6 @@ def compute_overall_stats(df, obs_col, model_col):
     x_clean = x_all[mask_all]
     y_clean = y_all[mask_all]
 
-    if len(x_clean) < 2:
-        return np.nan, np.nan, np.nan, 0
-
     slope, intercept = np.polyfit(x_clean, y_clean, 1)
     y_pred = slope * x_clean + intercept
     r_squared = 1 - np.sum((y_clean - y_pred)**2) / np.sum((y_clean - y_clean.mean())**2)
