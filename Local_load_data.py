@@ -1,16 +1,19 @@
-# config_local
 import pandas as pd
 import json
 from shapely import wkt
 import geopandas as gpd
 
+# Define data path. This one is for scenario 1150
+scenario_path = r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\\"
+ 
+
 def load_data():
-    df1 = pd.read_excel(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\analysis\validation\vis_worksheet.xlsx", sheet_name='fwy_worksheet')
-    df2 = pd.read_excel(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\analysis\validation\vis_worksheet.xlsx", sheet_name='allclass_worksheet')
-    df3 = pd.read_excel(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\analysis\validation\vis_worksheet.xlsx", sheet_name='truck_worksheet')
-    df4 = pd.read_excel(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\analysis\validation\vis_worksheet.xlsx", sheet_name='board_worksheet')
-    df_link = pd.read_csv(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\report\hwyTcad.csv",dtype={7: str, 8: str})
-    df_route = pd.read_csv(r"T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2\report\transitRoute.csv")
+    df1 = pd.read_csv(rf"{scenario_path}\analysis\validation\vis_worksheet - fwy_worksheet.csv")
+    df2 = pd.read_csv(rf"{scenario_path}\analysis\validation\vis_worksheet - allclass_worksheet.csv")
+    df3 = pd.read_csv(rf"{scenario_path}\analysis\validation\vis_worksheet - truck_worksheet.csv")
+    df4 = pd.read_csv(rf"{scenario_path}\analysis\validation\vis_worksheet - board_worksheet.csv")
+    df_link = pd.read_csv(rf"{scenario_path}\report\hwyTcad.csv",dtype={7: str, 8: str})
+    df_route = pd.read_csv(rf"{scenario_path}\report\transitRoute.csv")
     df_scenario = pd.DataFrame({'scenario_id': [1150], 'scenario_name': ['2022_S0_v2'], 'scenario_yr': [2022]})
 
     df1['label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
