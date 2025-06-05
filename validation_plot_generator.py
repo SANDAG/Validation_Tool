@@ -209,8 +209,8 @@ def create_map(geojson_data,id_field):
 
         return {
             color: color,
-            weight: 3,
-            opacity: 0.8
+            weight: 2,
+            opacity: 0.7
         };
     }""")
     return dl.Map(

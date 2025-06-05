@@ -16,7 +16,6 @@ else:
 print(f"✅ Running in environment: {ENV}")
 
 if ENV == "local":
-    # Read Data from different source based on environment
     raw_paths = os.getenv("LOCAL_SCENARIO_LIST", "")
     scenario_dirs = [p.strip() for p in raw_paths.split(',') if p.strip()]
 
@@ -25,9 +24,9 @@ if ENV == "local":
         with open(meta_path, "r") as f:
             meta = yaml.safe_load(f)
         return {
-            "scenario_id": int(meta.get("scenario_id", -1)),
-            "scenario_name": meta.get("scenario_title", "unknown"),
-            "scenario_yr": int(meta.get("scenario_year", 0))
+            "scenario_id": int(meta.get("scenario_id")),
+            "scenario_name": meta.get("scenario_title"),
+            "scenario_yr": int(meta.get("scenario_year"))
         }
 
     dfs = {
@@ -35,12 +34,13 @@ if ENV == "local":
         "df2": [],
         "df3": [],
         "df4": [],
-        "df_link": [],
-        "df_route": [],
         "df_scenario": []
     }
 
-    for scenario_path in scenario_dirs:
+    df_link = None
+    df_route = None
+
+    for i, scenario_path in enumerate(scenario_dirs):
         meta = read_metadata(scenario_path)
 
         try:
@@ -48,9 +48,13 @@ if ENV == "local":
             dfs["df2"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - allclass_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
             dfs["df3"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - truck_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
             dfs["df4"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - board_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
-            dfs["df_link"].append(pd.read_csv(f"{scenario_path}\\report\\hwyTcad.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"]))
-            dfs["df_route"].append(pd.read_csv(f"{scenario_path}\\report\\transitRoute.csv").assign(scenario_id=meta["scenario_id"]))
             dfs["df_scenario"].append(pd.DataFrame([meta]))
+
+            # Only load df_link and df_route once from the first scenario
+            if i == 0:
+                df_link = pd.read_csv(f"{scenario_path}\\report\\hwyTcad.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"])
+                df_route = pd.read_csv(f"{scenario_path}\\report\\transitRoute.csv").assign(scenario_id=meta["scenario_id"])
+
         except FileNotFoundError as e:
             print(f"⚠️ Missing file in {scenario_path}: {e}")
 
@@ -59,17 +63,11 @@ if ENV == "local":
     df2 = pd.concat(dfs["df2"], ignore_index=True)
     df3 = pd.concat(dfs["df3"], ignore_index=True)
     df4 = pd.concat(dfs["df4"], ignore_index=True)
-    df_link = pd.concat(dfs["df_link"], ignore_index=True)
-    df_route = pd.concat(dfs["df_route"], ignore_index=True)
     df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
 
-    df1.columns = df1.columns.str.lower()
-    df2.columns = df2.columns.str.lower()
-    df3.columns = df3.columns.str.lower()
-    df4.columns = df4.columns.str.lower()
-    df_link.columns = df_link.columns.str.lower()
-    df_route.columns = df_route.columns.str.lower()
-
+    # Lowercase column names
+    for df in [df1, df2, df3, df4, df_link, df_route]:
+        df.columns = df.columns.str.lower()
 elif ENV == 'Azure':
     raw_ids = os.getenv("scenario_id_list", "")
     scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
@@ -84,9 +82,9 @@ elif ENV == 'Azure':
         df2 = pd.read_sql(f'SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})',connection) # import all class
         df3 = pd.read_sql(f'SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})',connection) # import truck
         df4 = pd.read_sql(f'SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})',connection) # import transit board
-        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry as Shape FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = ({default_scenario})',connection)
-        df_route = pd.read_sql(f'SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape  as Shape FROM tam_dev.abm3.network__transit_route WHERE scenario_id = ({default_scenario})',connection)
-        df_scenario = pd.read_sql(f'SELECT * FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})',connection)
+        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = ({default_scenario})',connection)
+        df_route = pd.read_sql(f'SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE scenario_id = ({default_scenario})',connection)
+        df_scenario = pd.read_sql(f'SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})',connection)
 
 
     df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
