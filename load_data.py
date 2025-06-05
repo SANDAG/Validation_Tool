@@ -66,27 +66,34 @@ if ENV == "local":
     df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
 
 elif ENV == 'Azure':
-    raw_ids = os.getenv("scenario_id_list", "")
+    raw_ids = os.getenv("AZURE_SCENARIO_LIST", "")
     scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
     scenario_str = ','.join(map(str, scenario_id_list))
     default_scenario = 1150
 
-    with sql.connect(server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME"),
-                    http_path       = os.getenv("DATABRICKS_HTTP_PATH"),
-                    access_token    = os.getenv("DATABRICKS_TOKEN")) as connection:
-        
-        df1 = pd.read_sql(f'SELECT * FROM tam_dev.validation.fwy WHERE scenario_id IN ({scenario_str})',connection)  # import hwy
-        df2 = pd.read_sql(f'SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})',connection) # import all class
-        df3 = pd.read_sql(f'SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})',connection) # import truck
-        df4 = pd.read_sql(f'SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})',connection) # import transit board
-        df_link = pd.read_sql(f'SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = ({default_scenario})',connection)
-        df_route = pd.read_sql(f'SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE scenario_id = ({default_scenario})',connection)
-        df_scenario = pd.read_sql(f'SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})',connection)
+    def query_to_df(cursor, query):
+        cursor.execute(query)
+        return cursor.fetchall_arrow().to_pandas()
 
-    df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
-    df2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
-    df3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
-    df4 = df4.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
+    with sql.connect(
+        server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
+        http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+        access_token=os.getenv("DATABRICKS_TOKEN")
+    ) as connection:
+        with connection.cursor() as cursor:
+            df1 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.fwy WHERE scenario_id IN ({scenario_str})")
+            df2 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})")
+            df3 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})")
+            df4 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})")
+            df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = {default_scenario}")
+            df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE scenario_id = {default_scenario}")
+            df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
+
+    # Clean up data
+    df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
+    df2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
+    df3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
+    df4 = df4.drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
 
 # add label column
 df1['label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
