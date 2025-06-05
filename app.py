@@ -11,25 +11,10 @@ import dash_leaflet as dl
 import numpy as np
 from dash import callback_context
 import dash_bootstrap_components as dbc
-from Azure_load_data import load_data
+from load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures,prepare_boarding_tables
 from warnings import filterwarnings
 filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
-
-# Identify Environment
-if "DATABRICKS_HTTP_PATH" in os.environ:
-    ENV = "Azure"
-else:
-    ENV = "local"
-
-print(f"✅ Running in environment: {ENV}")
-
-# Import data according to environment
-if ENV == "local":
-    from Local_load_data import load_data
-
-else:
-    from Azure_load_data import load_data
 
 data = load_data()
 df1_all = data["df1"]
