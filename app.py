@@ -13,8 +13,6 @@ from dash import callback_context
 import dash_bootstrap_components as dbc
 from load_data import load_data
 from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures,prepare_boarding_tables
-from warnings import filterwarnings
-filterwarnings("ignore", category=UserWarning, message='.*pandas only supports SQLAlchemy connectable.*')
 
 data = load_data()
 df1_all = data["df1"]

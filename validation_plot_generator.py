@@ -432,12 +432,13 @@ def bar_scatter_layout(
 def prepare_boarding_tables(df):
     time_periods = ['ea', 'am', 'md', 'pm', 'ev', 'day']
     mode_col = 'mode_name'
+
     # Observed
     observed = df.groupby(mode_col)[[f'board_{tp}' for tp in time_periods]].sum().round(0)
 
     # Model
     model = df.groupby(mode_col)[[f'{tp}_board' for tp in time_periods]].sum().round(0)
-    model.columns = [f'board_{tp}' for tp in time_periods]  # Rename to match observed for easier comparison
+    model.columns = [f'board_{tp}' for tp in time_periods]
 
     # Difference
     diff = model - observed
@@ -450,6 +451,15 @@ def prepare_boarding_tables(df):
     observed.loc['Total'] = observed.sum()
     model.loc['Total'] = model.sum()
     diff.loc['Total'] = diff.sum()
-    gap.loc['Total'] = gap.mean().round(0).astype('Int64')  # use average for gap
+
+    # Calculate total gap from raw df, not groupby
+    total_gap_dict = {}
+    for tp in time_periods:
+        obs_sum = df[f'board_{tp}'].sum()
+        model_sum = df[f'{tp}_board'].sum()
+        gap_pct = ((model_sum - obs_sum) / obs_sum * 100) if obs_sum != 0 else np.nan
+        total_gap_dict[f'board_{tp}'] = round(gap_pct)
+
+    gap.loc['Total'] = pd.Series(total_gap_dict).astype('Int64')
 
     return observed, model, diff, gap
