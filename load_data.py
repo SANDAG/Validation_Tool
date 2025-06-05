@@ -65,9 +65,6 @@ if ENV == "local":
     df4 = pd.concat(dfs["df4"], ignore_index=True)
     df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
 
-    # Lowercase column names
-    for df in [df1, df2, df3, df4, df_link, df_route]:
-        df.columns = df.columns.str.lower()
 elif ENV == 'Azure':
     raw_ids = os.getenv("scenario_id_list", "")
     scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
@@ -86,7 +83,6 @@ elif ENV == 'Azure':
         df_route = pd.read_sql(f'SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE scenario_id = ({default_scenario})',connection)
         df_scenario = pd.read_sql(f'SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})',connection)
 
-
     df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
     df3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date']).drop_duplicates()
@@ -95,6 +91,9 @@ elif ENV == 'Azure':
 # add label column
 df1['label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
 df4['transit_gap_day'] = df4['gap_day']
+# Lowercase column names
+for df in [df1, df2, df3, df4, df_link, df_route]:
+    df.columns = df.columns.str.lower()
 
 # Processing Geojson files
 # Processsing merged files to inculde all links from all_class and truck
