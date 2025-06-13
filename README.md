@@ -13,8 +13,9 @@
 ## Deployment in Local environment:
 
 1.  Makre sure you have access to T drive. Connect to VPN if needed
+2.  Create a virtual environment and install packages in `requirements.txt`
 
-2.  Create .env
+3.  Create .env
   
      `LOCAL_FLAG=1` It is required!
      
