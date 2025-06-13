@@ -8,10 +8,10 @@ from pathlib import Path
 from databricks import sql
 
 # Identify Environment
-if os.getenv("LOCAL_FLAG") == "1":
-    ENV = "local"
-else:
+if os.getenv("LOCAL_FLAG") == "0":
     ENV = "Azure"
+else:
+    ENV = "local"
 
 print(f"✅ Running in environment: {ENV}")
 
@@ -21,6 +21,14 @@ if ENV == "local":
 
     def read_metadata(scenario_path):
         meta_path = Path(scenario_path) / "output" / "datalake_metadata.yaml"
+        if not meta_path.exists():
+            folder_name = Path(scenario_path).name
+            print(f"⚠️ Metadata file missing in {scenario_path}, assigning default scenario_id=999 and name='{folder_name}'")
+            return {
+                "scenario_id": 999,
+                "scenario_name": folder_name,
+                "scenario_yr": 0
+            }
         with open(meta_path, "r") as f:
             meta = yaml.safe_load(f)
         return {
