@@ -2,6 +2,18 @@
 
 
 ## File structure:
+```
+.
+├── .github
+│   └── workflows
+│       └── azure_dev_validation-tool.yml
+├── .gitignore
+├── README.md
+├── app.py
+├── load_data.py
+├── requirements.txt
+└── validation_plot_generator.py
+```
 
 - app.py: main script defining the layout of dash app. Including page layout design, scenario selector, menu and page switching and callbacks.
 - load_data.py: script to read data from databricks and T drive according to environment
