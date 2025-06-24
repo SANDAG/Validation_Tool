@@ -31,7 +31,7 @@
   
      `LOCAL_FLAG=1` It is required!
      
-     `LOCAL_SCENARIO_LIST=T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2,...`
+     `LOCAL_SCENARIO_LIST=T:\***`
     
      Then define LOCAL_SCNEARIO_LIST as data paths of all scenarios that you want to compare in the visualization board
 
@@ -43,9 +43,9 @@
 
 - set up environment variables (use token to read data from databricks)
   
-  ` DATABRICKS_SERVER_HOSTNAME = https://adb-3893261652776219.19.azuredatabricks.net/ `
+  ` DATABRICKS_SERVER_HOSTNAME = ***`
   
-  ` DATABRICKS_HTTP_PATH = /sql/1.0/warehouses/41cbd7de44cc187c `
+  ` DATABRICKS_HTTP_PATH = ***`
   
   ` DATABRICKS_TOKEN = your_token `
   
