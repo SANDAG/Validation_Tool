@@ -99,13 +99,13 @@ def load_data():
             access_token=os.getenv("DATABRICKS_TOKEN")
         ) as connection:
             with connection.cursor() as cursor:
-                df1 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.fwy WHERE scenario_id IN ({scenario_str})")
-                df2 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})")
-                df3 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})")
-                df4 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})")
-                df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
-                df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
-                df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
+                df1 = query_to_df(cursor, f"SELECT * FROM tam.validation.fwy WHERE scenario_id IN ({scenario_str})")
+                df2 = query_to_df(cursor, f"SELECT * FROM tam.validation.all_class WHERE scenario_id IN ({scenario_str})")
+                df3 = query_to_df(cursor, f"SELECT * FROM tam.validation.truck WHERE scenario_id IN ({scenario_str})")
+                df4 = query_to_df(cursor, f"SELECT * FROM tam.validation.board WHERE scenario_id IN ({scenario_str})")
+                df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM tam.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
+                df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
+                df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM tam.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
 
         # Clean up data
         df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
