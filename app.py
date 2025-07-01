@@ -36,8 +36,11 @@ slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_fi
 slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
 
 # === Call Function to create map ===
-leaflet_map = create_map(geojson_data,'hwycovid')
-leaflet_map_r = create_map(geojson_data_r,'route_str')
+initial_id = df_scenario["scenario_id"].iloc[0]
+initial_geojson_link = geojson_data.get(initial_id, {"type": "FeatureCollection", "features": []})
+initial_geojson_route = geojson_data_r.get(initial_id, {"type": "FeatureCollection", "features": []})
+leaflet_map = create_map(initial_geojson_link, id_field="hwycovid")
+leaflet_map_r =  create_map(initial_geojson_route, id_field="route_str")
 
 # === Initialize Dash App ===
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
@@ -953,6 +956,23 @@ def update_boarding_tables(scenario_id):
             make_table(gap, "Boardings Gap(%)"),
         ], style={'display': 'flex', 'justifyContent': 'space-between'})
     ])
+
+@app.callback(
+    Output("geojson", "data", allow_duplicate=True),
+    Output("geojson", "hideout", allow_duplicate=True),
+    Input("scenario_selector", "value"),
+    State("url", "pathname"),
+    prevent_initial_call=True
+)
+def update_geojson_by_scenario(scenario_id, pathname):
+    if pathname == "/transit_validation":
+        data = geojson_data_r.get(scenario_id, {"type": "FeatureCollection", "features": []})
+        print(f"🚌 [Transit] scenario_id {scenario_id} → {len(data['features'])} features")
+        return data, {"highlight_id": None, "id_field": "route_str"}
+    else:
+        data = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
+        print(f"🛣️ [Hwy] scenario_id {scenario_id} → {len(data['features'])} features")
+        return data, {"highlight_id": None, "id_field": "hwycovid"}
 
 # === Run App ===
 if __name__ == '__main__':

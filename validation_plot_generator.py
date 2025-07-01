@@ -6,16 +6,6 @@ from dash import Dash, html, dash_table, dcc
 import dash_leaflet as dl
 from dash_extensions.javascript import assign
 
-source_color_map = {
-    'PeMS': '#08306b',
-    'San Diego': '#F6C800',
-    'Chula Vista': '#F65166',
-    'Carlsbad': '#49C2D6',
-    'El Cajon': '#F2762E',
-    'Oceanside': '#2E87C8',
-    'Del Mar': '#A3E7D8',
-    'Coronado': '#C3B1E1'
-}
 
 def build_scatter_plot(df, obs_col, model_col,id_column):
     """
@@ -28,7 +18,7 @@ def build_scatter_plot(df, obs_col, model_col,id_column):
         id_column: id column in df
 
     Returns:
-        go.Figure: Plotly figure with points and best fit line.
+        px.scatter: Plotly figure with points and best fit line.
         float: R-squared value.
         float: slope of regression line.
         float: prmse (as % of mean observed).
@@ -56,7 +46,7 @@ def build_scatter_plot(df, obs_col, model_col,id_column):
         y=model_col,
         custom_data=[id_column],
         labels={obs_col: 'Observed Count', model_col: 'Model Flow'},
-        color_discrete_sequence=["#08306b"],
+        color_discrete_sequence=["#084d6b"],
         opacity=0.4
     )
     fig.update_traces(marker=dict(size=9))
@@ -132,10 +122,13 @@ def build_source_ring_chart(df, source_col='source'):
         'Chula Vista': '#F65166',
         'Carlsbad': '#49C2D6',
         'MTS':'#49C2D6',
+        'Military': '#49C2D6',
         'El Cajon': '#F2762E',
         'Oceanside': '#2E87C8',
         'NCTD':'#2E87C8',
+        'Port of San Diego': '#2E87C8', 
         'Del Mar': '#A3E7D8',
+        'Caltrans':'#A3E7D8',
         'Coronado': '#C3B1E1'
     }
 
@@ -155,7 +148,6 @@ def build_source_ring_chart(df, source_col='source'):
 
     fig.update_layout(
         showlegend=False,
-        legend=dict(orientation="v", x=1.2, y=0.5),
         margin=dict(t=5, b=5, l=5, r=5)
     )
 
@@ -163,11 +155,12 @@ def build_source_ring_chart(df, source_col='source'):
 
 
 # === Create Leaflet Map ===
-def create_map(geojson_data,id_field):
+def create_map(initial_data=None, id_field="hwycovid"):
+    if initial_data is None:
+        initial_data = {"type": "FeatureCollection", "features": []}
     # Define a simple hover style
     hover_style = dict(weight=5, color='#666', dashArray='', fillOpacity=0.7)
     # === Define style function directly in JavaScript ===
-    # This approach avoids issues with the arrow_function
     style_function = assign("""function(feature, context) {
         const hideout = context.hideout || {};
         const highlight_id = hideout.highlight_id;
@@ -175,10 +168,6 @@ def create_map(geojson_data,id_field):
 
         const feature_id = feature.properties[id_field];
         const isHighlighted = highlight_id !== null && feature_id == highlight_id;
-
-        if (isHighlighted) {
-            return { color: "yellow", weight: 6, opacity: 1.0 };
-        }
 
         const gap = feature.properties.gap_day;
         let color = 'gray';
@@ -203,7 +192,6 @@ def create_map(geojson_data,id_field):
             return {
                 color: 'yellow',
                 weight: 7,
-                opacity: 1.0
             };
         }
 
@@ -223,10 +211,10 @@ def create_map(geojson_data,id_field):
                 attribution='© OpenStreetMap contributors, © CartoDB'
             ),
             dl.GeoJSON(
-                data=geojson_data,
+                data=initial_data,
                 id="geojson",
                 hoverStyle=hover_style,
-                hideout={"highlight_id": None, "selected": []},
+                hideout={"highlight_id": None, "id_field": id_field, "selected": []},
                 style=style_function,
                 children=[
                     dl.Popup(id="popup")

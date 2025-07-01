@@ -27,11 +27,12 @@
 1.  Makre sure you have access to T drive. Connect to VPN if needed
 2.  Create a virtual environment and install packages in `requirements.txt`
 
-3.  Create .env
+3.  Create local yam file `config.yaml`
   
-     `LOCAL_FLAG=1` It is required!
+     `LOCAL_FLAG:1` **(required!)**
      
-     `LOCAL_SCENARIO_LIST=T:\***`
+     `LOCAL_SCENARIO_LIST:
+        - T:\***`
     
      Then define LOCAL_SCNEARIO_LIST as data paths of all scenarios that you want to compare in the visualization board
 
@@ -49,7 +50,7 @@
   
   ` DATABRICKS_TOKEN = your_token `
   
-  `SCM_DO_BUILD_DURING_DEPLOYMENT=true`
+  `SCM_DO_BUILD_DURING_DEPLOYMENT=true` **(required!)**
   
 - set up start up command under configuration
 

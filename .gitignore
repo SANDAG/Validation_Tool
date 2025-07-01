@@ -5,3 +5,4 @@ __pycache__/
 .env
 venv_1/
 venv_2/
+config.yaml

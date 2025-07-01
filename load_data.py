@@ -6,10 +6,14 @@ import os
 import yaml
 from pathlib import Path
 from databricks import sql
-
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def load_config(path="config.yaml"):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
 
 def load_data():
 
@@ -22,8 +26,8 @@ def load_data():
     print(f"✅ Running in environment: {ENV}")
 
     if ENV == "local":
-        raw_paths = os.getenv("LOCAL_SCENARIO_LIST", "")
-        scenario_dirs = [p.strip() for p in raw_paths.split(',') if p.strip()]
+        config = load_config()
+        scenario_dirs = config.get("LOCAL_SCENARIO_LIST", [])
 
         def read_metadata(scenario_path):
             meta_path = Path(scenario_path) / "output" / "datalake_metadata.yaml"
@@ -48,6 +52,8 @@ def load_data():
             "df2": [],
             "df3": [],
             "df4": [],
+            "df_link": [],
+             "df_route": [],
             "df_scenario": []
         }
 
@@ -62,12 +68,9 @@ def load_data():
                 dfs["df2"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - allclass_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
                 dfs["df3"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - truck_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
                 dfs["df4"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - board_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
+                dfs["df_link"].append(pd.read_csv(f"{scenario_path}\\report\\hwyTcad.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"]))
+                dfs["df_route"].append(pd.read_csv(f"{scenario_path}\\report\\transitRoute.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"]))
                 dfs["df_scenario"].append(pd.DataFrame([meta]))
-
-                # Only load df_link and df_route once from the first scenario
-                if i == 0:
-                    df_link = pd.read_csv(f"{scenario_path}\\report\\hwyTcad.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"])
-                    df_route = pd.read_csv(f"{scenario_path}\\report\\transitRoute.csv").assign(scenario_id=meta["scenario_id"])
 
             except FileNotFoundError as e:
                 print(f"⚠️ Missing file in {scenario_path}: {e}")
@@ -77,13 +80,14 @@ def load_data():
         df2 = pd.concat(dfs["df2"], ignore_index=True)
         df3 = pd.concat(dfs["df3"], ignore_index=True)
         df4 = pd.concat(dfs["df4"], ignore_index=True)
+        df_link = pd.concat(dfs["df_link"],ignore_index=True)
+        df_route = pd.concat(dfs["df_route"],ignore_index=True)
         df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
 
     elif ENV == 'Azure':
         raw_ids = os.getenv("AZURE_SCENARIO_LIST", "")
         scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
         scenario_str = ','.join(map(str, scenario_id_list))
-        default_scenario = 1150
 
         def query_to_df(cursor, query):
             cursor.execute(query)
@@ -99,8 +103,8 @@ def load_data():
                 df2 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.all_class WHERE scenario_id IN ({scenario_str})")
                 df3 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.truck WHERE scenario_id IN ({scenario_str})")
                 df4 = query_to_df(cursor, f"SELECT * FROM tam_dev.validation.board WHERE scenario_id IN ({scenario_str})")
-                df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE scenario_id = {default_scenario}")
-                df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE scenario_id = {default_scenario}")
+                df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM tam_dev.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
+                df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM tam_dev.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
                 df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM tam_dev.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
 
         # Clean up data
@@ -118,40 +122,44 @@ def load_data():
 
     # Processing Geojson files
     # Processsing merged files to inculde all links from all_class and truck
-    df2_subset = df2[['hwycovid', 'gap_day', 'vmt_gap_day']].rename(
+    df2_subset = df2[['hwycovid', 'gap_day', 'vmt_gap_day','scenario_id']].rename(
     columns={'gap_day': 'gap_day_all_class','vmt_gap_day': 'vmt_gap_day_all_class'})
-    df3_subset = df3[['hwycovid', 'gap_day', 'vmt_gap_day']].rename(
-        columns={'gap_day': 'gap_day_truck','vmt_gap_day': 'vmt_gap_day_truck'})
-
-    # Merge the two DataFrames on hwycovid using an outer join
-    merged_df = pd.merge(df2_subset, df3_subset, on='hwycovid', how='outer')
+    df3_subset = df3[['hwycovid', 'gap_day', 'vmt_gap_day','scenario_id']].rename(
+    columns={'gap_day': 'gap_day_truck','vmt_gap_day': 'vmt_gap_day_truck'})
+    merged_df = pd.merge(df2_subset, df3_subset, on=['hwycovid', 'scenario_id'], how='outer')
     merged_df['hwycovid_str'] = merged_df['hwycovid'].astype(str)
     merged_df['gap_day'] = merged_df['gap_day_all_class'].combine_first(merged_df['gap_day_truck'])
-    df_link['geometry'] = df_link['geometry'].apply(wkt.loads)
-    df_link['id'] = df_link['id'].astype(str)
-    merged = merged_df.merge(df_link, left_on='hwycovid_str', right_on='id', how='left')
 
-    merged = gpd.GeoDataFrame(merged, geometry='geometry', crs='EPSG:2230')
-    merged = merged.to_crs('EPSG:4326')
-    geojson_str = merged.to_json()
-    geojson_data = json.loads(geojson_str)
+    geojson_links_sce = {}
+    geojson_route_sce = {}
 
-    df_route['geometry'] = df_route['geometry'].apply(wkt.loads)
-    df_route['route_name_id'] = df_route['route_name'].astype(str).str[:-3]
-    df4['route_str'] = df4['route'].astype(str)
-    merged_route = df4.merge(df_route,left_on='route_str',right_on='route_name_id',how='left')
-    merged_route = gpd.GeoDataFrame(merged_route, geometry='geometry', crs='EPSG:2230')
-    merged_route = merged_route.to_crs('EPSG:4326')
-    geojson_str_r = merged_route.to_json()
-    geojson_data_r = json.loads(geojson_str_r)
+    for scenario_id in df_scenario['scenario_id'].unique():
+        # --- Highway GeoJSON ---
+        df_link_s = df_link[df_link['scenario_id'] == scenario_id].copy()
+        df_link_s['id'] = df_link_s['id'].astype(str)
+        df_link_s['geometry'] = df_link_s['geometry'].apply(wkt.loads)
+        merged_df_s = merged_df[merged_df['scenario_id'] == scenario_id].copy()
+        merged_link_s = merged_df_s.merge(df_link_s, left_on='hwycovid_str', right_on='id', how='left')
+        merged_link_s = gpd.GeoDataFrame(merged_link_s, geometry='geometry', crs='EPSG:2230').to_crs('EPSG:4326')
+        geojson_links_sce[scenario_id] = json.loads(merged_link_s.to_json())
+        # --- Route GeoJSON ---
+        df_route_s = df_route[df_route['scenario_id'] == scenario_id].copy()
+        df_route_s['route_name_id'] = df_route_s['route_name'].astype(str).str[:-3] #last 3 digits is route id
+        df_route_s['geometry'] = df_route_s['geometry'].apply(wkt.loads)
+        df4_s = df4[df4['scenario_id'] == scenario_id].copy()
+        df4_s['route_str'] = df4_s['route'].astype(str)
+        merged_route_s = df4_s.merge(df_route_s, left_on='route_str', right_on='route_name_id', how='left')
+        merged_route_s = gpd.GeoDataFrame(merged_route_s, geometry='geometry', crs='EPSG:2230').to_crs('EPSG:4326')
+        geojson_route_sce[scenario_id] = json.loads(merged_route_s.to_json())
+
 
     return {
         "df1": df1,
         "df2": df2,
         "df3": df3,
         "df4": df4,
-        "geojson_data": geojson_data,
-        "geojson_data_r":geojson_data_r,
+        "geojson_data": geojson_links_sce,
+        "geojson_data_r":geojson_route_sce,
         "df_scenario":df_scenario
         }
 
