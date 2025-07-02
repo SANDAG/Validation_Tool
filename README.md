@@ -72,5 +72,6 @@ Current Validation app:  https://validation-tool-hzhfg6cmgggndbh5.westus-01.azur
 1. Clone main branch in local
 2. Edit script and review changes by running app locally:
    ` python app.py `
-4. After checking, push changes to main branch
-5. It will automatically update in Azure web service by git workflow.
+4. After checking, push changes to dev branch
+5. It will automatically update dash app in dev slot in Azure web service by git workflow. Test updates by preview of dev slot.
+6. After testing, merge change from dev branch to main branch. And this updates in main branch will trigger workflow to update dash app in production slot in Azure web service.
