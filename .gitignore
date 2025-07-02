@@ -1,6 +1,5 @@
 =======
 # Ignore local and dev-specific files
-assets/
 __pycache__/
 .env
 venv_1/
