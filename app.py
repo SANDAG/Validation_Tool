@@ -414,48 +414,18 @@ def show_popup(clickData):
     ])
 
 # === Map Highlight Callback ===
-@app.callback(
-    Output("geojson", "hideout"),
-    Output("map", "center"),
-    Output("map", "zoom"),
-    Input("scatter", "clickData"),
-    State("geojson", "hideout")
-)
-def zoom_from_scatter(clickData, hideout):
-    if not clickData:
-        return hideout, dash.no_update, dash.no_update
-
-    selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout, geojson_data, 'hwycovid')
-
-@app.callback(
-    Output("geojson", "hideout", allow_duplicate=True),
-    Output("map", "center", allow_duplicate=True),
-    Output("map", "zoom", allow_duplicate=True),
-    Input("truck_scatter", "clickData"),
-    State("geojson", "hideout"),
-    prevent_initial_call=True
-)
-def zoom_from_truck_scatter(clickData, hideout):
-    if not clickData:
-        return hideout, dash.no_update, dash.no_update
-    selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout,geojson_data, 'hwycovid')
-
-@app.callback(
-    Output("geojson", "hideout", allow_duplicate=True),
-    Output("map", "center", allow_duplicate=True),
-    Output("map", "zoom", allow_duplicate=True),
-    Input("board_scatter", "clickData"),
-    State("geojson", "hideout"),
-    prevent_initial_call=True
-)
-def zoom_from_board_scatter(clickData, hideout):
-    if not clickData:
-        return hideout, dash.no_update, dash.no_update
-
-    selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout,geojson_data_r, 'route_str')
+def get_map_center(selected_id, hideout, df, id):
+    hideout["highlight_id"] = selected_id
+    hideout["id_field"] = id
+    for feature in df["features"]:
+        if str(feature["properties"].get(id)) == str(selected_id):
+            coords = feature["geometry"]["coordinates"]
+            print(f"🔍 Geometry type: {feature['geometry']['type']}")
+            print(f"🔍 Raw coords: {coords[:2]}")
+            mid_idx = len(coords) // 2
+            center = coords[mid_idx][::-1]
+            return hideout, center, 14
+    return hideout, dash.no_update, dash.no_update
 
 @app.callback(
     Output("geojson", "hideout", allow_duplicate=True),
@@ -463,25 +433,67 @@ def zoom_from_board_scatter(clickData, hideout):
     Output("map", "zoom", allow_duplicate=True),
     Input("line_plot", "clickData"),
     State("geojson", "hideout"),
+    State("scenario_selector", "value"),
     prevent_initial_call=True
 )
-def zoom_from_line(clickData, hideout):
+def zoom_from_line(clickData, hideout,scenario_id):
     if not clickData:
         return hideout, dash.no_update, dash.no_update
 
     selected_id = clickData["points"][0]["customdata"][0]
-    return get_map_center(selected_id, hideout,geojson_data, 'hwycovid')
+    geojson = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    return get_map_center(selected_id, hideout,geojson, 'hwycovid')
 
-def get_map_center(selected_id, hideout, df, id):
-    hideout["highlight_id"] = selected_id
-    hideout["id_field"] = id
-    for feature in df["features"]:
-        if str(feature["properties"].get(id)) == str(selected_id):
-            coords = feature["geometry"]["coordinates"]
-            mid_idx = len(coords) // 2
-            center = coords[mid_idx][::-1]
-            return hideout, center, 14
-    return hideout, dash.no_update, dash.no_update
+@app.callback(
+    Output("geojson", "hideout"),
+    Output("map", "center"),
+    Output("map", "zoom"),
+    Input("scatter", "clickData"),
+    State("geojson", "hideout"),
+    State("scenario_selector", "value")
+)
+def zoom_from_scatter(clickData, hideout,scenario_id):
+    if not clickData:
+        return hideout, dash.no_update, dash.no_update
+
+    selected_id = clickData["points"][0]["customdata"][0]
+    geojson = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    print(f"🧭 Selected ID: {selected_id}")
+    print(f"🧭 Features available: {len(geojson.get('features', []))}")
+    return get_map_center(selected_id, hideout, geojson, 'hwycovid')
+
+@app.callback(
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("map", "center", allow_duplicate=True),
+    Output("map", "zoom", allow_duplicate=True),
+    Input("truck_scatter", "clickData"),
+    State("geojson", "hideout"),
+    State("scenario_selector", "value"),
+    prevent_initial_call=True
+)
+def zoom_from_truck_scatter(clickData, hideout,scenario_id):
+    if not clickData:
+        return hideout, dash.no_update, dash.no_update
+    selected_id = clickData["points"][0]["customdata"][0]
+    geojson = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    return get_map_center(selected_id, hideout,geojson, 'hwycovid')
+
+@app.callback(
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("map", "center", allow_duplicate=True),
+    Output("map", "zoom", allow_duplicate=True),
+    Input("board_scatter", "clickData"),
+    State("geojson", "hideout"),
+    State("scenario_selector", "value"),
+    prevent_initial_call=True
+)
+def zoom_from_board_scatter(clickData, hideout,scenario_id):
+    if not clickData:
+        return hideout, dash.no_update, dash.no_update
+
+    selected_id = clickData["points"][0]["customdata"][0]
+    geojson = geojson_data_r.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    return get_map_center(selected_id, hideout,geojson, 'route_str')
 
 # === Bar Graph Callback ===
 from plotly import graph_objects as go

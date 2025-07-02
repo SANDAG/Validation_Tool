@@ -1,0 +1,5 @@
+LOCAL_FLAG: 1
+LOCAL_SCENARIO_LIST:
+  - T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2
+  - T:\STORAGE-63T\car_tests\timexfer_tests_select_cap_vmt\2022_S0_noTimeXfer
+  - T:\STORAGE-63T\sxu_tests\2022_v1530_validation

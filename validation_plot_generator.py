@@ -46,7 +46,7 @@ def build_scatter_plot(df, obs_col, model_col,id_column):
         y=model_col,
         custom_data=[id_column],
         labels={obs_col: 'Observed Count', model_col: 'Model Flow'},
-        color_discrete_sequence=["#084d6b"],
+        color_discrete_sequence=["#08306b"],
         opacity=0.4
     )
     fig.update_traces(marker=dict(size=9))
@@ -155,7 +155,7 @@ def build_source_ring_chart(df, source_col='source'):
 
 
 # === Create Leaflet Map ===
-def create_map(initial_data=None, id_field="hwycovid"):
+def create_map(initial_data=None, id_field="hwycovid",map_id="map", geojson_id="geojson"):
     if initial_data is None:
         initial_data = {"type": "FeatureCollection", "features": []}
     # Define a simple hover style
@@ -202,7 +202,7 @@ def create_map(initial_data=None, id_field="hwycovid"):
         };
     }""")
     return dl.Map(
-        id='map',
+        id=map_id,
         center=[32.9, -117],
         zoom=10, 
         children=[
@@ -212,7 +212,7 @@ def create_map(initial_data=None, id_field="hwycovid"):
             ),
             dl.GeoJSON(
                 data=initial_data,
-                id="geojson",
+                id=geojson_id,
                 hoverStyle=hover_style,
                 hideout={"highlight_id": None, "id_field": id_field, "selected": []},
                 style=style_function,
