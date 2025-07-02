@@ -88,6 +88,7 @@ def load_data():
         raw_ids = os.getenv("AZURE_SCENARIO_LIST", "")
         scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
         scenario_str = ','.join(map(str, scenario_id_list))
+        catalog = os.getenv("DBRICKS_CATALOG", "tam")
 
         def query_to_df(cursor, query):
             cursor.execute(query)
@@ -97,7 +98,6 @@ def load_data():
             server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
             http_path=os.getenv("DATABRICKS_HTTP_PATH"),
             access_token=os.getenv("DATABRICKS_TOKEN"),
-            catalog = os.getenv("DBRICKS_CATALOG", "tam")
         ) as connection:
             with connection.cursor() as cursor:
                 df1 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.fwy WHERE scenario_id IN ({scenario_str})")
