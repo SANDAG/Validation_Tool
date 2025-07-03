@@ -72,6 +72,7 @@ jobs:
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
         with:
           app-name: 'validation-tool'
           slot-name: ${{ github.ref_name == 'main' && 'Production' || 'dev' }}
