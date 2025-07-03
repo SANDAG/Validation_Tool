@@ -32,6 +32,7 @@ df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
     
 # === Compute Overall Stats for Display ===
 slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_filtered2, 'count_day', 'day_flow')
+
 # for truck
 slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
 
@@ -261,8 +262,8 @@ def page_vmt_comparison():
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'city_nm', 'By City'), style={'width': '50%', 'height': '100%'}),
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'rdclass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
             ], style={'display': 'flex', 'height': '50%'})
-        ], style={'height': 'calc(100vh - 80px)'})  # Adjust to exclude H2 + padding
-    ], style={'padding': '10px', 'height': '100vh', 'boxSizing': 'border-box',})
+        ], style={'height': '700px'})
+    ], style={'padding': '10px', 'height': '700px', 'boxSizing': 'border-box',})
 
 scenario_options = [
 {"label": f"{row['scenario_id']}: {row['scenario_name']}", "value": row["scenario_id"]}
@@ -331,13 +332,24 @@ app.layout = html.Div([
         'transition': 'left 0.3s'
     }),
 
-    # === Page Content (also pushed down) ===
+    # === Page Content  ===
     html.Div(id='page-content', style={
         'marginLeft': '0px',
         'transition': 'margin-left 0.3s',
         'padding': '60px 20px 20px 20px', 
         'fontFamily': 'Open Sans, verdana, arial, sans-serif'
-    })
+    }),
+    # === SANDAG Logo ===
+    html.Img(
+        src='/assets/sandag-logo.png',
+        style={
+            'position': 'fixed',
+            'top': '10px',
+            'right': '10px',
+            'height': '40px',
+            'zIndex': '1002'
+        }
+    )
 ])
 
 

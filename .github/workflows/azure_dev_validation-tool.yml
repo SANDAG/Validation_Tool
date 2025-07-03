@@ -66,12 +66,13 @@ jobs:
       - name: Azure login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_18266B9D2DA54A75A425CAC0EE3158A8 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_49822DD9EB0E42269022444C80D8F5C5 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_BC8669598FD046D4BB731572E9D5F69B }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_B263D2ABCF9B4CC192AB7A9E5DCCF8B5 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C8D7D4D7234348858DF7C3EF0E0E4658 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8B49E3CAE12540C08DBBEAF33BD5C740 }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
         with:
           app-name: 'validation-tool'
           slot-name: ${{ github.ref_name == 'main' && 'Production' || 'dev' }}
