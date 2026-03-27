@@ -34,10 +34,12 @@ The SANDAG Validation Tool is a Python-Dash web application designed to validate
 │       └── azure_dev_validation-tool.yml
 |       └──main_validation-tool.yml
 ├── .gitignore
+├── .python-version
 ├── README.md
 ├── app.py
 ├── config.yaml
 ├── load_data.py
+├── pyproject.toml
 ├── requirements.txt
 └── validation_plot_generator.py
 ```
@@ -45,7 +47,8 @@ The SANDAG Validation Tool is a Python-Dash web application designed to validate
 - app.py: main script defining the layout of dash app. Including page layout design, scenario selector, menu and page switching and callbacks.
 - load_data.py: script to read data from databricks and T drive according to environment
 - validation_plot_generator.py: includes a series functions about generating graphs, maps and layouts
-- requirements.txt: required python packages (for both local and Azure web service)
+- pyproject.toml: project metadata and dependencies (managed by uv)
+- requirements.txt: legacy requirements file (kept for compatibility)
 - config.yaml: config file for local use. Set up scenarios that will load in app.
 - git workflow: automatically update changes into Azure web service and redeploy (main branch to production slot and dev branch to dev slot)
 
@@ -69,12 +72,26 @@ The SANDAG Validation Tool is a Python-Dash web application designed to validate
 
 <br>
 
-## ⚙️Local Setup:
+## ⚙️ Local Setup:
 
-1.  Makre sure you have access to T drive. Connect to VPN if needed
-2.  Create a virtual environment and install packages in `requirements.txt`
+1.  Make sure you have access to T drive. Connect to VPN if needed
 
-3.  Set up scenarios that you want to load in app by `config.yaml`
+2.  Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if not already installed:
+    ```bash
+    # On Windows
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    
+    # On macOS/Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+3.  Create a virtual environment and install dependencies:
+    ```bash
+    uv venv
+    uv pip install -e .
+    ```
+
+4.  Set up scenarios that you want to load in app by `config.yaml`
   
      `LOCAL_FLAG:1`
      
@@ -83,9 +100,21 @@ The SANDAG Validation Tool is a Python-Dash web application designed to validate
     
    Define LOCAL_SCNEARIO_LIST as data paths of all scenarios that you want to compare in the visualization board
     
-5.  Launch app: Run `python app.py` in terminal and preview the dashboard in http://127.0.0.1:8050/
+5.  Launch app: Activate the virtual environment and run the app:
+    ```bash
+    # On Windows
+    .venv\Scripts\activate
+    
+    # On macOS/Linux
+    source .venv/bin/activate
+    
+    # Run the app
+    python app.py
+    ```
+    
+    Preview the dashboard in http://127.0.0.1:8050/
    
-6.  Press ctrcl c to stop
+6.  Press ctrl+c to stop
 
 <br>
 

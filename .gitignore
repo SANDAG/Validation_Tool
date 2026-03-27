@@ -6,3 +6,6 @@ venv_1/
 venv_2/
 .vscode/
 .venv/
+
+# uv
+uv.lock
