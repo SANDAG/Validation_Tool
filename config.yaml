@@ -1,4 +1,4 @@
-# LOCAL_FLAG: "0"
+LOCAL_FLAG: 1
 LOCAL_SCENARIO_LIST:
-  - T:\STORAGE-63T\2025RP_draft\abm_runs_v2\2022_S0_v2
-  - T:\STORAGE-63T\2025RP_draft\15_3_0_runs\2022_HOVedit
+  - T:\STORAGE-63T\2025RP_final\2022
+  - T:\STORAGE-63T\abm3_runs\ATC_test

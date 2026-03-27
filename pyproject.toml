@@ -76,6 +76,9 @@ dependencies = [
     "zipp==3.21.0",
 ]
 
+[tool.hatch.build.targets.wheel]
+py-modules = ["app", "load_data", "validation_plot_generator"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -85,10 +85,13 @@ The SANDAG Validation Tool is a Python-Dash web application designed to validate
     curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-3.  Create a virtual environment and install dependencies:
+3.  Install dependencies using uv:
     ```bash
-    uv venv
-    uv pip install -e .
+    # Option 1: Install from pyproject.toml (recommended)
+    uv pip install .
+    
+    # Option 2: Install from requirements.txt
+    uv pip install -r requirements.txt
     ```
 
 4.  Set up scenarios that you want to load in app by `config.yaml`
