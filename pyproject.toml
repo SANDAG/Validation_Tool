@@ -77,7 +77,8 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-py-modules = ["app", "load_data", "validation_plot_generator"]
+packages = []
+include = ["*.py", "*.yaml", "assets/"]
 
 [build-system]
 requires = ["hatchling"]
