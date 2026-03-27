@@ -186,8 +186,17 @@ def load_data():
         df4_s = df4[df4['scenario_id'] == scenario_id].copy()
         df4_s['route_str'] = df4_s['route'].astype(str)
         merged_route_s = df4_s.merge(df_route_s, left_on='route_str', right_on='route_name_id', how='left')
-        merged_route_s = gpd.GeoDataFrame(merged_route_s, geometry='geometry', crs='EPSG:2230').to_crs('EPSG:4326')
-        geojson_route_sce[scenario_id] = json.loads(merged_route_s.to_json())
+        # Filter out routes without geometry before creating GeoDataFrame
+        routes_without_geometry = merged_route_s[merged_route_s['geometry'].isna()]['route_str'].unique()
+        if len(routes_without_geometry) > 0:
+            print(f"⚠️ Routes without geometry data (scenario {scenario_id}): {', '.join(routes_without_geometry)}")
+        merged_route_s = merged_route_s[merged_route_s['geometry'].notna()].copy()
+        if len(merged_route_s) > 0:
+            merged_route_s = gpd.GeoDataFrame(merged_route_s, geometry='geometry', crs='EPSG:2230').to_crs('EPSG:4326')
+            geojson_route_sce[scenario_id] = json.loads(merged_route_s.to_json())
+        else:
+            geojson_route_sce[scenario_id] = {"type": "FeatureCollection", "features": []}
+
 
 
     return {

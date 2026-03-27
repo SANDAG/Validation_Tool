@@ -43,7 +43,7 @@ initial_id = df_scenario["scenario_id"].iloc[0]
 initial_geojson_link = geojson_data.get(initial_id, {"type": "FeatureCollection", "features": []})
 initial_geojson_route = geojson_data_r.get(initial_id, {"type": "FeatureCollection", "features": []})
 leaflet_map = create_map(initial_geojson_link, id_field="hwycovid")
-leaflet_map_r =  create_map(initial_geojson_route, id_field="route_str")
+leaflet_map_r =  create_map(initial_geojson_route, id_field="route_str", id_prefix="transit_")
 
 # === Initialize Dash App ===
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
@@ -152,13 +152,28 @@ def page_board_validation():
         show_groupby_selector=False
     )
 
+    # Get unique route IDs for filter
+    all_routes = sorted(df4['route'].dropna().astype(str).unique())
+    route_options = [{'label': 'ALL', 'value': 'ALL'}] + [{'label': route, 'value': route} for route in all_routes]
+    
     return html.Div([
         left_col,
         middle_col,
         html.Div([
-            html.H3("Map: Gap Day by Route  ID"),
-            leaflet_map_r
-        ], style={'flex': '1', 'padding': '0px', 'boxSizing': 'border-box', 'height': '100%', 'width': '33.3%'})
+            html.H3("Map: Gap Day by Route ID"),
+            html.Div([
+                html.Label("Filter Route ID:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+                dcc.Dropdown(
+                    id='route_filter',
+                    options=route_options,
+                    value=['ALL'],
+                    multi=True,
+                    placeholder='Select Route(s)',
+                    style={'marginBottom': '10px'}
+                )
+            ], style={'padding': '10px'}),
+            html.Div(leaflet_map_r, style={'height': '600px', 'width': '100%'})
+        ], style={'flex': '1', 'padding': '10px', 'boxSizing': 'border-box', 'display': 'flex', 'flexDirection': 'column', 'width': '33.3%'})
     ], style={'display': 'flex', 'width': '100%', 'height': '700px'})
 
 # === board table page===
@@ -460,6 +475,27 @@ def show_popup(clickData):
         for key, label in labels.items() if key in props and props[key] is not None
     ])
 
+@app.callback(
+    Output("transit_popup", "children"),
+    Input("transit_geojson", "clickData")
+)
+def show_transit_popup(clickData):
+    
+    if not clickData or "properties" not in clickData:
+        return "No feature selected"
+
+    props = clickData["properties"]
+    labels = {
+        "route_str": "Route ID",
+        "route_name_id": "Route Name ID",
+        "transit_gap_day": "Transit Gap Day"
+    }
+
+    return html.Div([
+        html.Div(f"{label}: {props[key]}%") if 'gap' in key else html.Div(f"{label}: {props[key]}")
+        for key, label in labels.items() if key in props and props[key] is not None
+    ])
+
 # === Map Highlight Callback ===
 def get_map_center(selected_id, hideout, df, id):
     hideout["highlight_id"] = selected_id
@@ -526,11 +562,11 @@ def zoom_from_truck_scatter(clickData, hideout,scenario_id):
     return get_map_center(selected_id, hideout,geojson, 'hwycovid')
 
 @app.callback(
-    Output("geojson", "hideout", allow_duplicate=True),
-    Output("map", "center", allow_duplicate=True),
-    Output("map", "zoom", allow_duplicate=True),
+    Output("transit_geojson", "hideout", allow_duplicate=True),
+    Output("transit_map", "center", allow_duplicate=True),
+    Output("transit_map", "zoom", allow_duplicate=True),
     Input("board_scatter", "clickData"),
-    State("geojson", "hideout"),
+    State("transit_geojson", "hideout"),
     State("scenario_selector", "value"),
     prevent_initial_call=True
 )
@@ -1025,13 +1061,62 @@ def update_boarding_tables(scenario_id):
 )
 def update_geojson_by_scenario(scenario_id, pathname):
     if pathname == "/transit_validation":
-        data = geojson_data_r.get(scenario_id, {"type": "FeatureCollection", "features": []})
-        print(f"🚌 [Transit] scenario_id {scenario_id} → {len(data['features'])} features")
-        return data, {"highlight_id": None, "id_field": "route_str"}
+        # Transit page uses different map, skip this callback
+        return dash.no_update, dash.no_update
     else:
         data = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
         print(f"🛣️ [Hwy] scenario_id {scenario_id} → {len(data['features'])} features")
         return data, {"highlight_id": None, "id_field": "hwycovid"}
+
+@app.callback(
+    Output("transit_geojson", "data", allow_duplicate=True),
+    Output("transit_geojson", "hideout", allow_duplicate=True),
+    Input("route_filter", "value"),
+    Input("scenario_selector", "value"),
+    State("url", "pathname"),
+    prevent_initial_call=True
+)
+def filter_routes_on_map(selected_routes, scenario_id, pathname):
+    """Filter transit routes displayed on the map"""
+    if pathname != "/transit_validation":
+        return dash.no_update, dash.no_update
+    
+    # Get full geojson data for the scenario
+    full_geojson = geojson_data_r.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    
+    # If 'ALL' is selected or no filter, show all routes
+    if not selected_routes or 'ALL' in selected_routes:
+        return full_geojson, {"highlight_id": None, "id_field": "route_str"}
+    
+    # Filter features based on selected route IDs (convert to string for comparison)
+    filtered_features = [
+        feature for feature in full_geojson.get("features", [])
+        if str(feature.get("properties", {}).get("route_str")) in selected_routes
+    ]
+    
+    filtered_geojson = {
+        "type": "FeatureCollection",
+        "features": filtered_features
+    }
+    
+    print(f"🚌 [Route Filter] {len(filtered_features)} routes selected from {len(full_geojson.get('features', []))} total")
+    
+    return filtered_geojson, {"highlight_id": None, "id_field": "route_str"}
+
+@app.callback(
+    Output("transit_geojson", "data", allow_duplicate=True),
+    Output("transit_geojson", "hideout", allow_duplicate=True),
+    Input("scenario_selector", "value"),
+    State("url", "pathname"),
+    prevent_initial_call=True
+)
+def update_transit_geojson_by_scenario(scenario_id, pathname):
+    if pathname == "/transit_validation":
+        data = geojson_data_r.get(scenario_id, {"type": "FeatureCollection", "features": []})
+        print(f"🚌 [Transit] scenario_id {scenario_id} → {len(data['features'])} features")
+        return data, {"highlight_id": None, "id_field": "route_str"}
+    else:
+        return dash.no_update, dash.no_update
 
 # === Run App ===
 if __name__ == '__main__':

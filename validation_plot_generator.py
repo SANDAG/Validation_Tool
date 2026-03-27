@@ -165,9 +165,15 @@ def build_source_ring_chart(df, source_col='source'):
 
 
 # === Create Leaflet Map ===
-def create_map(initial_data=None, id_field="hwycovid"):
+def create_map(initial_data=None, id_field="hwycovid", id_prefix=""):
     if initial_data is None:
         initial_data = {"type": "FeatureCollection", "features": []}
+    
+    # Create unique IDs
+    map_id = f"{id_prefix}map" if id_prefix else "map"
+    geojson_id = f"{id_prefix}geojson" if id_prefix else "geojson"
+    popup_id = f"{id_prefix}popup" if id_prefix else "popup"
+    
     # Define a simple hover style
     hover_style = dict(weight=5, color='#666', dashArray='', fillOpacity=0.7)
     # === Define style function directly in JavaScript ===
@@ -212,7 +218,7 @@ def create_map(initial_data=None, id_field="hwycovid"):
         };
     }""")
     return dl.Map(
-        id='map',
+        id=map_id,
         center=[32.9, -117],
         zoom=10, 
         children=[
@@ -222,12 +228,12 @@ def create_map(initial_data=None, id_field="hwycovid"):
             ),
             dl.GeoJSON(
                 data=initial_data,
-                id="geojson",
+                id=geojson_id,
                 hoverStyle=hover_style,
                 hideout={"highlight_id": None, "id_field": id_field, "selected": []},
                 style=style_function,
                 children=[
-                    dl.Popup(id="popup")
+                    dl.Popup(id=popup_id)
                 ]
             ),
 
