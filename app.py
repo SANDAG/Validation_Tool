@@ -528,12 +528,13 @@ def zoom_from_line(clickData, hideout,scenario_id):
     return get_map_center(selected_id, hideout, geojson, 'hwycovid')
 
 @app.callback(
-    Output("geojson", "hideout"),
-    Output("map", "center"),
-    Output("map", "zoom"),
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("map", "center", allow_duplicate=True),
+    Output("map", "zoom", allow_duplicate=True),
     Input("scatter", "clickData"),
     State("geojson", "hideout"),
-    State("scenario_selector", "value")
+    State("scenario_selector", "value"),
+    prevent_initial_call=True
 )
 def zoom_from_scatter(clickData, hideout,scenario_id):
     if not clickData:
@@ -1053,22 +1054,6 @@ def update_boarding_tables(scenario_id):
     ])
 
 @app.callback(
-    Output("geojson", "data", allow_duplicate=True),
-    Output("geojson", "hideout", allow_duplicate=True),
-    Input("scenario_selector", "value"),
-    State("url", "pathname"),
-    prevent_initial_call=True
-)
-def update_geojson_by_scenario(scenario_id, pathname):
-    if pathname == "/transit_validation":
-        # Transit page uses different map, skip this callback
-        return dash.no_update, dash.no_update
-    else:
-        data = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
-        print(f"🛣️ [Hwy] scenario_id {scenario_id} → {len(data['features'])} features")
-        return data, {"highlight_id": None, "id_field": "hwycovid"}
-
-@app.callback(
     Output("transit_geojson", "data", allow_duplicate=True),
     Output("transit_geojson", "hideout", allow_duplicate=True),
     Input("route_filter", "value"),
@@ -1117,6 +1102,26 @@ def update_transit_geojson_by_scenario(scenario_id, pathname):
         return data, {"highlight_id": None, "id_field": "route_str"}
     else:
         return dash.no_update, dash.no_update
+
+# === Update Highway Map when scenario changes ===
+@app.callback(
+    Output("geojson", "data", allow_duplicate=True),
+    Output("geojson", "hideout", allow_duplicate=True),
+    Output("geojson", "key", allow_duplicate=True),
+    Input("scenario_selector", "value"),
+    prevent_initial_call=True
+)
+def update_highway_map(scenario_id):
+    data = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
+    
+    # Debug: Print sample gap_day values
+    if data.get('features'):
+        sample_gaps = [f['properties'].get('gap_day') for f in data['features'][:5]]
+        print(f"🛣️ [Highway Map] Updating to scenario_id {scenario_id} → {len(data.get('features', []))} features")
+        print(f"   Sample gap_day values: {sample_gaps}")
+    
+    # Force complete re-render with unique key and hideout containing scenario_id
+    return data, {"highlight_id": None, "id_field": "hwycovid", "scenario_id": scenario_id}, f"geojson-{scenario_id}"
 
 # === Run App ===
 if __name__ == '__main__':

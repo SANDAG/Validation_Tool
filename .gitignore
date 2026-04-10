@@ -9,3 +9,7 @@ venv_2/
 
 # uv
 uv.lock
+
+# local check
+check_route_994.py
+compare_transit_networks.py
